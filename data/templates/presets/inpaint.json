@@ -1,0 +1,155 @@
+{
+  "id": "inpaint",
+  "name": "Inpaint",
+  "category": "generation",
+  "description": "图像局部重绘/修复工作流",
+  "parameters": {
+    "checkpoint": {
+      "type": "model",
+      "model_type": "checkpoints",
+      "default": "sd_xl_base_1.0.safetensors",
+      "required": true,
+      "description": "基础模型"
+    },
+    "positive_prompt": {
+      "type": "text",
+      "default": "",
+      "multiline": true,
+      "description": "正向提示词"
+    },
+    "negative_prompt": {
+      "type": "text",
+      "default": "",
+      "multiline": true,
+      "description": "负向提示词"
+    },
+    "steps": {
+      "type": "number",
+      "default": 20,
+      "min": 1,
+      "max": 100,
+      "description": "采样步数"
+    },
+    "cfg": {
+      "type": "number",
+      "default": 8.0,
+      "min": 1.0,
+      "max": 30.0,
+      "description": "CFG Scale"
+    },
+    "seed": {
+      "type": "number",
+      "default": -1,
+      "random": true,
+      "description": "随机种子"
+    },
+    "sampler_name": {
+      "type": "select",
+      "default": "euler",
+      "options": ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_3m_sde"],
+      "description": "采样器"
+    },
+    "scheduler": {
+      "type": "select",
+      "default": "normal",
+      "options": ["normal", "karras", "exponential", "sgm_uniform"],
+      "description": "调度器"
+    },
+    "denoise": {
+      "type": "number",
+      "default": 0.85,
+      "min": 0.0,
+      "max": 1.0,
+      "description": "重绘幅度"
+    }
+  },
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "sd_xl_base_1.0.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "input.png"
+      },
+      "_meta": {
+        "title": "Input Image"
+      }
+    },
+    "3": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "mask.png"
+      },
+      "_meta": {
+        "title": "Mask"
+      }
+    },
+    "4": {
+      "class_type": "VAEEncode",
+      "inputs": {
+        "pixels": ["2", 0],
+        "vae": ["1", 2]
+      }
+    },
+    "5": {
+      "class_type": "SetLatentNoiseMask",
+      "inputs": {
+        "samples": ["4", 0],
+        "mask": ["3", 1]
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "",
+        "clip": ["1", 1]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "",
+        "clip": ["1", 1]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "8": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": ["1", 0],
+        "positive": ["6", 0],
+        "negative": ["7", 0],
+        "latent_image": ["5", 0],
+        "seed": 12345,
+        "steps": 20,
+        "cfg": 8.0,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 0.85
+      }
+    },
+    "9": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": ["8", 0],
+        "vae": ["1", 2]
+      }
+    },
+    "10": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": ["9", 0],
+        "filename_prefix": "ComfyUI_inpaint"
+      }
+    }
+  }
+}

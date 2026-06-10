@@ -1,0 +1,186 @@
+{
+  "id": "ip_adapter",
+  "name": "IP Adapter",
+  "category": "generation",
+  "description": "IP-Adapter 风格迁移工作流（需安装 ComfyUI_IPAdapter_plus）",
+  "parameters": {
+    "checkpoint": {
+      "type": "model",
+      "model_type": "checkpoints",
+      "default": "sd_xl_base_1.0.safetensors",
+      "required": true,
+      "description": "基础模型"
+    },
+    "positive_prompt": {
+      "type": "text",
+      "default": "",
+      "multiline": true,
+      "description": "正向提示词"
+    },
+    "negative_prompt": {
+      "type": "text",
+      "default": "",
+      "multiline": true,
+      "description": "负向提示词"
+    },
+    "width": {
+      "type": "number",
+      "default": 1024,
+      "min": 256,
+      "max": 2048,
+      "step": 64,
+      "description": "宽度"
+    },
+    "height": {
+      "type": "number",
+      "default": 1024,
+      "min": 256,
+      "max": 2048,
+      "step": 64,
+      "description": "高度"
+    },
+    "steps": {
+      "type": "number",
+      "default": 20,
+      "min": 1,
+      "max": 100,
+      "description": "采样步数"
+    },
+    "cfg": {
+      "type": "number",
+      "default": 8.0,
+      "min": 1.0,
+      "max": 30.0,
+      "description": "CFG Scale"
+    },
+    "seed": {
+      "type": "number",
+      "default": -1,
+      "random": true,
+      "description": "随机种子"
+    },
+    "sampler_name": {
+      "type": "select",
+      "default": "euler",
+      "options": ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_3m_sde"],
+      "description": "采样器"
+    },
+    "scheduler": {
+      "type": "select",
+      "default": "normal",
+      "options": ["normal", "karras", "exponential", "sgm_uniform"],
+      "description": "调度器"
+    },
+    "weight": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0.0,
+      "max": 2.0,
+      "description": "IP-Adapter 权重"
+    },
+    "preset": {
+      "type": "select",
+      "default": "PLUS (high strength)",
+      "options": [
+        "PLUS (high strength)",
+        "PLUS FACE (portraits)",
+        "STANDARD (medium strength)",
+        "VIT-G (medium strength)",
+        "LIGHT (low strength)"
+      ],
+      "description": "IP-Adapter 预设"
+    }
+  },
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "sd_xl_base_1.0.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "reference.png"
+      },
+      "_meta": {
+        "title": "Reference Image"
+      }
+    },
+    "3": {
+      "class_type": "IPAdapterUnifiedLoader",
+      "inputs": {
+        "model": ["1", 0],
+        "preset": "PLUS (high strength)"
+      }
+    },
+    "4": {
+      "class_type": "IPAdapter",
+      "inputs": {
+        "model": ["3", 0],
+        "ipadapter": ["3", 1],
+        "image": ["2", 0],
+        "weight": 0.8,
+        "start_at": 0.0,
+        "end_at": 1.0
+      }
+    },
+    "5": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "",
+        "clip": ["1", 1]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "",
+        "clip": ["1", 1]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "7": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1
+      }
+    },
+    "8": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": ["4", 0],
+        "positive": ["5", 0],
+        "negative": ["6", 0],
+        "latent_image": ["7", 0],
+        "seed": 12345,
+        "steps": 20,
+        "cfg": 8.0,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1.0
+      }
+    },
+    "9": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": ["8", 0],
+        "vae": ["1", 2]
+      }
+    },
+    "10": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": ["9", 0],
+        "filename_prefix": "ComfyUI_ipadapter"
+      }
+    }
+  }
+}

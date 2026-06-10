@@ -6,6 +6,7 @@ import { logger } from "./utils/logger.js";
 import { JobWatcher } from "./services/job-watcher.js";
 import { parseCliArgs } from "./transport/cli.js";
 import { startHttpServer } from "./transport/http.js";
+import { initTemplateManager, cleanupExpiredSessions } from "./services/template-manager.js";
 
 async function createConfiguredServer(): Promise<McpServer> {
   const server = new McpServer(
@@ -24,6 +25,20 @@ async function createConfiguredServer(): Promise<McpServer> {
 async function main() {
   const cli = parseCliArgs(process.argv);
   await JobWatcher.cleanupOldFiles();
+
+  // 初始化模板管理器（加载模板 + 恢复 Session）
+  const templateInfo = await initTemplateManager();
+  logger.info(
+    `Template manager initialized: ${templateInfo.templates} templates, ${templateInfo.restored_sessions} restored sessions`,
+  );
+
+  // 定时清理过期 Session（每小时）
+  setInterval(async () => {
+    const cleaned = await cleanupExpiredSessions();
+    if (cleaned > 0) {
+      logger.info(`Cleaned up ${cleaned} expired sessions`);
+    }
+  }, 3600 * 1000);
 
   if (cli.transport === "http") {
     await startHttpServer({

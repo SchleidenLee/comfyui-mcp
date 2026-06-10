@@ -1,0 +1,271 @@
+{
+  "name": "comfyui-mcp",
+  "server_type": "node",
+  "entry_point": "dist/index.js",
+  "command": "node",
+  "args": [
+    "dist/index.js"
+  ],
+  "variables": [
+    {
+      "key": "AWS_ACCESS_KEY_ID",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "AWS_REGION",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "AWS_S3_ENDPOINT",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "AWS_SECRET_ACCESS_KEY",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "AWS_SESSION_TOKEN",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "AZURE_STORAGE_ACCOUNT",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "AZURE_STORAGE_CONNECTION_STRING",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "AZURE_STORAGE_KEY",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "CIVITAI_API_TOKEN",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_ALWAYS_RESTART",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_API_KEY",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_ASSET_TTL_HOURS",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_CLOUD_URL",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_CONVERT_IMAGE_MAX_SOURCE_BYTES",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_DOWNLOAD_CACHE_DIR",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_HOST",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_LRU_CACHE_SIZE_GB",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_MCP_AGENT_ALLOWED_MODELS",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_MCP_AGENT_MODEL",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_MCP_AGENT_POC",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_MCP_AGENT_PORT",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_MCP_AGENT_TOKEN",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_MCP_AGENT_TUNNEL",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_PATH",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_PORT",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_PYTHON",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_RESTART_MAX_ATTEMPTS",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_RESTART_WINDOW_S",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_SKILL_CACHE_DIR",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_SSL",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_STARTUP_CHECK_INTERVAL_S",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_STARTUP_CHECK_MAX_TRIES",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_URL",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFYUI_WORKFLOWS_DIR",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFY_API_KEY",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFY_HOST",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "COMFY_PORT",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "GITHUB_TOKEN",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "HUGGINGFACE_TOKEN",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "LOG_LEVEL",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "MCP_TRANSPORT",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "REGISTRY_ACCESS_TOKEN",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    },
+    {
+      "key": "XDG_CONFIG_HOME",
+      "value": "",
+      "mode": "env",
+      "description": ""
+    }
+  ],
+  "status": "installed",
+  "updated_at": "2026-06-10T15:05:22.418809"
+}

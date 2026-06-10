@@ -1,0 +1,43 @@
+{
+  "id": "upscale",
+  "name": "Image Upscale",
+  "category": "upscaling",
+  "description": "图像超分辨率工作流",
+  "parameters": {
+    "upscale_model": {
+      "type": "model",
+      "model_type": "upscale_models",
+      "default": "RealESRGAN_x4plus.pth",
+      "required": true,
+      "description": "超分辨率模型"
+    }
+  },
+  "workflow": {
+    "1": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "input.png"
+      }
+    },
+    "2": {
+      "class_type": "UpscaleModelLoader",
+      "inputs": {
+        "model_name": "RealESRGAN_x4plus.pth"
+      }
+    },
+    "3": {
+      "class_type": "ImageUpscaleWithModel",
+      "inputs": {
+        "upscale_model": ["2", 0],
+        "image": ["1", 0]
+      }
+    },
+    "4": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": ["3", 0],
+        "filename_prefix": "ComfyUI_upscale"
+      }
+    }
+  }
+}

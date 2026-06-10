@@ -1,34 +1,20 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WorkflowJSON } from "../comfyui/types.js";
+import { modifyWorkflow, type ModifyOperation } from "../services/workflow-composer.js";
 import {
-  createWorkflow,
-  modifyWorkflow,
-  TEMPLATE_NAMES,
-  type ModifyOperation,
-} from "../services/workflow-composer.js";
+  selectTemplate,
+  getSessionWorkflow,
+  updateSessionWorkflow,
+  getTemplateIds,
+} from "../services/template-manager.js";
 import { getObjectInfo } from "../comfyui/client.js";
 import { errorToToolResult, ValidationError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
-function parseWorkflow(input: unknown): WorkflowJSON {
-  if (typeof input === "string") {
-    try {
-      const parsed = JSON.parse(input);
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        throw new ValidationError("Workflow JSON must be an object with node IDs as keys");
-      }
-      return parsed as WorkflowJSON;
-    } catch (err) {
-      if (err instanceof ValidationError) throw err;
-      throw new ValidationError(`Invalid JSON string: ${(err as Error).message}`);
-    }
-  }
-  if (typeof input === "object" && input !== null && !Array.isArray(input)) {
-    return input as WorkflowJSON;
-  }
-  throw new ValidationError("Workflow must be a JSON string or object");
-}
+// ============================================================================
+// 操作 Schema
+// ============================================================================
 
 const operationSchema = z.discriminatedUnion("op", [
   z.object({
@@ -65,33 +51,57 @@ const operationSchema = z.discriminatedUnion("op", [
   }),
 ]);
 
+// ============================================================================
+// 工具注册
+// ============================================================================
+
 export function registerWorkflowComposeTools(server: McpServer): void {
-  // 1. create_workflow
+  // ==========================================================================
+  // create_workflow - 从模板创建 Session（替代旧版，返回 session_id 而非 JSON）
+  // ==========================================================================
   server.tool(
     "create_workflow",
-    `Create a ready-to-run ComfyUI API-format workflow from a built-in template (${TEMPLATE_NAMES.join(", ")}). Pure local generation — does not contact ComfyUI and has no side effects. Returns the complete workflow JSON; pass it to validate_workflow or enqueue_workflow. Unsupplied params fall back to template defaults, so the result may reference checkpoints/models that must exist on your ComfyUI server before it will execute.`,
+    "Create an editable session from a built-in template. Returns a session_id for use with modify_workflow and run_workflow. Use list_templates to see available templates and their parameters. This is an alias for select_template.",
     {
-      template: z
-        .enum(TEMPLATE_NAMES as [string, ...string[]])
-        .describe("Template name: txt2img, img2img, upscale, or inpaint"),
+      template_id: z.string().describe("Template ID (use list_templates to see available)"),
       params: z
         .record(z.any())
         .optional()
         .default({})
         .describe(
-          "Template parameters; recognized keys depend on the template. txt2img: checkpoint, positive_prompt, negative_prompt, width, height, steps, cfg, seed, sampler_name, scheduler. img2img/inpaint add image_path (and mask_path for inpaint) and denoise. upscale adds upscale_model. Unknown keys are ignored; omitted keys use template defaults.",
+          "Template parameters to apply. Available keys depend on the template. Common: checkpoint, positive_prompt, negative_prompt, width, height, steps, cfg, seed, sampler_name, scheduler.",
         ),
     },
-    async ({ template, params }) => {
+    async ({ template_id, params }) => {
       try {
-        logger.info("Creating workflow", { template, params });
-        const workflow = createWorkflow(template, params);
+        logger.info("Creating workflow session", { template_id, params });
+
+        // 如果模板 ID 不在列表中，给出友好提示
+        const available = getTemplateIds();
+        if (!available.includes(template_id)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Template "${template_id}" not found.\n\nAvailable templates: ${available.join(", ")}\n\nUse list_templates for details on parameters.`,
+              },
+            ],
+          };
+        }
+
+        const result = await selectTemplate(template_id, params as Record<string, unknown>);
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(workflow, null, 2),
+              text: [
+                `Session created: **${result.session_id}**`,
+                `Template: ${result.template.name}`,
+                "",
+                "Now use `modify_workflow` with this session_id to add/remove nodes,",
+                "or `run_workflow` to execute the workflow.",
+              ].join("\n"),
             },
           ],
         };
@@ -101,38 +111,53 @@ export function registerWorkflowComposeTools(server: McpServer): void {
     },
   );
 
-  // 2. modify_workflow
+  // ==========================================================================
+  // modify_workflow - 修改 Session（接受 session_id 而非 JSON）
+  // ==========================================================================
   server.tool(
     "modify_workflow",
-    "Apply modification operations to an existing ComfyUI workflow. Supports: set_input, add_node, remove_node, connect, insert_between. Returns the modified workflow JSON and IDs of any newly added nodes.",
+    "Apply modification operations to a session's workflow. Supports: set_input, add_node, remove_node, connect, insert_between. Operates on the session identified by session_id, not on raw JSON.",
     {
-      workflow: z
-        .union([z.string(), z.record(z.any())])
-        .describe("ComfyUI workflow JSON (as a JSON string or object)"),
+      session_id: z.string().describe("Session ID (from select_template or create_workflow)"),
       operations: z
         .array(operationSchema)
         .describe(
           "Array of operations to apply in order. Each has an 'op' field: set_input, add_node, remove_node, connect, or insert_between",
         ),
     },
-    async ({ workflow, operations }) => {
+    async ({ session_id, operations }) => {
       try {
-        logger.info("Modifying workflow", { opCount: operations.length });
-        const parsed = parseWorkflow(workflow);
-        const result = modifyWorkflow(parsed, operations as ModifyOperation[]);
+        logger.info("Modifying session workflow", { session_id, opCount: operations.length });
+
+        // 获取当前工作流
+        const workflow = getSessionWorkflow(session_id);
+        if (!workflow) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Session not found: ${session_id}. Use create_workflow or select_template first.`,
+              },
+            ],
+          };
+        }
+
+        // 应用修改
+        const result = modifyWorkflow(workflow as WorkflowJSON, operations as ModifyOperation[]);
+
+        // 更新 Session
+        updateSessionWorkflow(session_id, result.workflow as Record<string, unknown>);
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(
-                {
-                  workflow: result.workflow,
-                  added_node_ids: result.added_ids,
-                },
-                null,
-                2,
-              ),
+              text: [
+                `Session **${session_id}** modified.`,
+                `New nodes added: ${result.added_ids.length > 0 ? result.added_ids.join(", ") : "none"}`,
+                "",
+                "Use `run_workflow` to execute, or apply more modifications.",
+              ].join("\n"),
             },
           ],
         };
@@ -142,7 +167,9 @@ export function registerWorkflowComposeTools(server: McpServer): void {
     },
   );
 
-  // 3. get_node_info
+  // ==========================================================================
+  // get_node_info - 查询节点信息
+  // ==========================================================================
   server.tool(
     "get_node_info",
     "Query a running ComfyUI server's /object_info endpoint for installed node type definitions (inputs, outputs, category, description). Requires a reachable ComfyUI instance; results reflect that server's installed custom nodes. Use the node_type filter to inspect a specific node before composing or modifying a workflow. Note: when more than 20 node types match, returns only a summarized list (name, display_name, category, description) and asks you to narrow the filter to get full input/output schemas; 20 or fewer returns complete definitions.",
