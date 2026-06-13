@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WorkflowJSON } from "../comfyui/types.js";
 import { validateWorkflow } from "../services/workflow-validator.js";
+import { getSessionWorkflow } from "../services/template-manager.js";
 import { errorToToolResult, ValidationError } from "../utils/errors.js";
 
 function parseWorkflow(input: unknown): WorkflowJSON {
@@ -26,16 +27,34 @@ function parseWorkflow(input: unknown): WorkflowJSON {
 export function registerWorkflowValidateTools(server: McpServer): void {
   server.tool(
     "validate_workflow",
-    "Validate a ComfyUI workflow without executing it. Checks for missing node types, broken connections, invalid output indices, missing models, and other issues. Returns a list of errors and warnings.",
+    "Validate a ComfyUI workflow without executing it. Checks for missing node types, broken connections, invalid output indices, missing models, and other issues. Returns errors with fix suggestions and auto_fix operations. Accepts either a session_id or a raw workflow JSON.",
     {
+      session_id: z.string().optional().describe("Session ID to validate (from select_template or load_workflow)"),
       workflow: z
         .union([z.string(), z.record(z.any())])
-        .describe("ComfyUI workflow in API format (JSON string or object)"),
+        .optional()
+        .describe("ComfyUI workflow in API format (JSON string or object). Use session_id instead if you have one."),
     },
-    async (args) => {
+    async ({ session_id, workflow }) => {
       try {
-        const workflow = parseWorkflow(args.workflow);
-        const result = await validateWorkflow(workflow);
+        let wf: WorkflowJSON;
+        if (session_id) {
+          const sessionWf = getSessionWorkflow(session_id);
+          if (!sessionWf) {
+            return {
+              content: [{ type: "text" as const, text: `Session not found: ${session_id}` }],
+            };
+          }
+          wf = sessionWf as WorkflowJSON;
+        } else if (workflow) {
+          wf = parseWorkflow(workflow);
+        } else {
+          return {
+            content: [{ type: "text" as const, text: "Must provide either session_id or workflow" }],
+          };
+        }
+
+        const result = await validateWorkflow(wf);
 
         const lines: string[] = [];
         lines.push(`## ${result.summary}`);
@@ -54,6 +73,12 @@ export function registerWorkflowValidateTools(server: McpServer): void {
                 ? `Node ${issue.node_id} (${issue.node_type})`
                 : "Workflow";
               lines.push(`- **${loc}**: ${issue.message}`);
+              if (issue.suggestion) {
+                lines.push(`  > 💡 Suggestion: ${issue.suggestion}`);
+              }
+              if (issue.auto_fix) {
+                lines.push(`  > 🔧 Auto-fix: ${JSON.stringify(issue.auto_fix)}`);
+              }
             }
             lines.push("");
           }
@@ -65,6 +90,9 @@ export function registerWorkflowValidateTools(server: McpServer): void {
                 ? `Node ${issue.node_id} (${issue.node_type})`
                 : "Workflow";
               lines.push(`- **${loc}**: ${issue.message}`);
+              if (issue.suggestion) {
+                lines.push(`  > 💡 Suggestion: ${issue.suggestion}`);
+              }
             }
           }
         }

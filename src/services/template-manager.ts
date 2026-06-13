@@ -45,6 +45,12 @@ export interface Template {
   modified_at?: string;
 }
 
+/** Session 操作历史条目 */
+export interface SessionHistoryEntry {
+  timestamp: number;
+  operation: string;
+}
+
 /** Session 状态 */
 export interface Session {
   id: string;
@@ -53,6 +59,8 @@ export interface Session {
   workflow: Record<string, unknown>;
   created_at: number;
   last_modified: number;
+  history?: SessionHistoryEntry[];
+  previous_workflow?: Record<string, unknown>; // 用于 undo
 }
 
 /** Session 创建参数 */
@@ -365,19 +373,29 @@ export function getSessionWorkflow(sessionId: string): Record<string, unknown> |
 }
 
 /**
- * 更新 Session 的工作流
+ * 更新 Session 的工作流（自动保存上一状态用于 undo，记录历史）
  */
 export function updateSessionWorkflow(
   sessionId: string,
   workflow: Record<string, unknown>,
+  operationDesc?: string,
 ): void {
   const session = sessionStore.get(sessionId);
   if (!session) {
     throw new Error(`Session not found: ${sessionId}`);
   }
 
+  // 保存上一状态（用于 undo）
+  session.previous_workflow = JSON.parse(JSON.stringify(session.workflow));
   session.workflow = workflow;
   session.last_modified = Date.now();
+
+  // 记录历史
+  if (!session.history) session.history = [];
+  session.history.push({
+    timestamp: Date.now(),
+    operation: operationDesc ?? "workflow modified",
+  });
 
   // 同步到磁盘
   const cacheFile = path.join(getCacheDir(), `${sessionId}.json`);
@@ -532,6 +550,283 @@ export async function saveAsWorkflow(
   logger.info(`Saved session ${sessionId} as workflow ${fileName}`);
 
   return { file_path: filePath };
+}
+
+// ============================================================================
+// 统一保存（支持嵌套路径）
+// ============================================================================
+
+/** 保存选项 */
+export interface SaveSessionOptions {
+  save_as: "template" | "workflow";
+  sub_path?: string;
+  sync_to_webui?: boolean;
+}
+
+/** 保存结果 */
+export interface SaveSessionResult {
+  name: string;
+  file_path: string;
+  webui_path?: string;
+}
+
+/**
+ * 统一保存 Session（支持嵌套子文件夹）
+ */
+export async function saveSession(
+  sessionId: string,
+  name: string,
+  options: SaveSessionOptions,
+): Promise<SaveSessionResult> {
+  const session = sessionStore.get(sessionId);
+  if (!session) {
+    throw new Error(`Session not found: ${sessionId}`);
+  }
+
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  // 构建保存路径（支持嵌套子文件夹）
+  let basePath: string;
+  if (options.save_as === "template") {
+    basePath = options.sub_path
+      ? path.join(getCustomTemplatesDir(), options.sub_path)
+      : getCustomTemplatesDir();
+  } else {
+    basePath = options.sub_path
+      ? path.join(getWorkflowsDir(), options.sub_path)
+      : getWorkflowsDir();
+  }
+
+  const filePath = path.join(basePath, `${slug}.json`);
+  await saveJsonFile(filePath, session.workflow);
+
+  logger.info(`Saved session ${sessionId} as ${options.save_as}: ${filePath}`);
+
+  return { name: slug, file_path: filePath };
+}
+
+// ============================================================================
+// 导入 JSON
+// ============================================================================
+
+/** 导入选项 */
+export interface ImportOptions {
+  save_as: "session" | "template" | "workflow";
+  sub_path?: string;
+}
+
+/** 导入结果 */
+export interface ImportResult {
+  name: string;
+  file_path: string;
+  session_id?: string;
+}
+
+/**
+ * 从 JSON 字符串导入工作流
+ */
+export async function importFromJson(
+  jsonStr: string,
+  name: string,
+  options: ImportOptions,
+): Promise<ImportResult> {
+  const workflow = JSON.parse(jsonStr) as Record<string, unknown>;
+
+  // 自动检测 UI 格式（包含 "links" 字段）并转换为 API 格式
+  const wfAny = workflow as Record<string, unknown>;
+  if (wfAny.links || (wfAny.extra as Record<string, unknown>)?.ds) {
+    // 简易 UI → API 转换：只提取 nodes
+    if (workflow.nodes && Array.isArray(workflow.nodes)) {
+      const apiWorkflow: Record<string, unknown> = {};
+      for (const node of workflow.nodes) {
+        if (node.id !== undefined) {
+          apiWorkflow[String(node.id)] = {
+            class_type: node.type,
+            inputs: node.inputs || {},
+          };
+        }
+      }
+      Object.assign(workflow, apiWorkflow);
+      // 清理 UI 字段
+      delete workflow.nodes;
+      delete workflow.links;
+      delete workflow.groups;
+      delete workflow.extra;
+      delete workflow.version;
+    }
+  }
+
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  if (options.save_as === "session") {
+    const sessionId = generateSessionId();
+    const session: Session = {
+      id: sessionId,
+      source_type: "workflow",
+      source_id: `${slug}.json`,
+      workflow,
+      created_at: Date.now(),
+      last_modified: Date.now(),
+      history: [{ timestamp: Date.now(), operation: "imported from JSON" }],
+    };
+    sessionStore.set(sessionId, session);
+    await saveJsonFile(path.join(getCacheDir(), `${sessionId}.json`), session);
+    logger.info(`Imported JSON as session ${sessionId}`);
+    return { name: slug, file_path: path.join(getCacheDir(), `${sessionId}.json`), session_id: sessionId };
+  }
+
+  // 保存为文件或模板
+  const basePath = options.save_as === "template"
+    ? (options.sub_path ? path.join(getCustomTemplatesDir(), options.sub_path) : getCustomTemplatesDir())
+    : (options.sub_path ? path.join(getWorkflowsDir(), options.sub_path) : getWorkflowsDir());
+
+  const filePath = path.join(basePath, `${slug}.json`);
+  await saveJsonFile(filePath, workflow);
+  logger.info(`Imported JSON as ${options.save_as}: ${filePath}`);
+
+  return { name: slug, file_path: filePath };
+}
+
+// ============================================================================
+// Session 增强
+// ============================================================================
+
+/**
+ * 基于现有 Session 创建分支
+ */
+export async function forkSession(
+  sessionId: string,
+  name?: string,
+): Promise<{ session_id: string; workflow: Record<string, unknown> }> {
+  const session = sessionStore.get(sessionId);
+  if (!session) {
+    throw new Error(`Session not found: ${sessionId}`);
+  }
+
+  const forkId = generateSessionId();
+  const forked: Session = {
+    id: forkId,
+    source_type: "template",
+    source_id: `fork_of_${sessionId}`,
+    workflow: JSON.parse(JSON.stringify(session.workflow)), // 深拷贝
+    created_at: Date.now(),
+    last_modified: Date.now(),
+    history: [{ timestamp: Date.now(), operation: `forked from ${sessionId}${name ? ` as "${name}"` : ""}` }],
+  };
+
+  sessionStore.set(forkId, forked);
+  await saveJsonFile(path.join(getCacheDir(), `${forkId}.json`), forked);
+  logger.info(`Forked session ${sessionId} -> ${forkId}`);
+
+  return { session_id: forkId, workflow: forked.workflow };
+}
+
+/**
+ * 获取 Session 操作历史
+ */
+export function getSessionHistory(sessionId: string): SessionHistoryEntry[] | null {
+  const session = sessionStore.get(sessionId);
+  return session?.history ?? null;
+}
+
+/**
+ * 回退上一次修改
+ */
+export async function undoModify(sessionId: string): Promise<{ node_count: number }> {
+  const session = sessionStore.get(sessionId);
+  if (!session) {
+    throw new Error(`Session not found: ${sessionId}`);
+  }
+  if (!session.previous_workflow) {
+    throw new Error("No previous state to undo to");
+  }
+
+  // 恢复上一状态
+  session.workflow = session.previous_workflow;
+  session.previous_workflow = undefined;
+  session.last_modified = Date.now();
+  session.history?.push({ timestamp: Date.now(), operation: "undo" });
+
+  await saveJsonFile(path.join(getCacheDir(), `${sessionId}.json`), session);
+  logger.info(`Undid modification for session ${sessionId}`);
+
+  return { node_count: Object.keys(session.workflow).length };
+}
+
+/** Session 差异 */
+export interface SessionDiff {
+  session_a: string;
+  session_b: string;
+  node_count_a: number;
+  node_count_b: number;
+  added_nodes: string[];
+  removed_nodes: string[];
+  modified_nodes: string[];
+}
+
+/**
+ * 对比两个 Session
+ */
+export function diffSessions(sessionA: string, sessionB: string): SessionDiff {
+  const sa = sessionStore.get(sessionA);
+  const sb = sessionStore.get(sessionB);
+  if (!sa || !sb) throw new Error("Session not found");
+
+  const nodesA = Object.keys(sa.workflow);
+  const nodesB = Object.keys(sb.workflow);
+  const setA = new Set(nodesA);
+  const setB = new Set(nodesB);
+
+  const added = nodesB.filter((n) => !setA.has(n));
+  const removed = nodesA.filter((n) => !setB.has(n));
+  const common = nodesA.filter((n) => setB.has(n));
+  const modified = common.filter((n) => JSON.stringify(sa.workflow[n]) !== JSON.stringify(sb.workflow[n]));
+
+  return {
+    session_a: sessionA,
+    session_b: sessionB,
+    node_count_a: nodesA.length,
+    node_count_b: nodesB.length,
+    added_nodes: added,
+    removed_nodes: removed,
+    modified_nodes: modified,
+  };
+}
+
+/** 格式化差异为文本 */
+export function formatDiff(diff: SessionDiff): string {
+  const lines: string[] = [];
+  lines.push(`## Session Diff: ${diff.session_a} vs ${diff.session_b}`);
+  lines.push("");
+  lines.push(`- ${diff.session_a}: ${diff.node_count_a} nodes`);
+  lines.push(`- ${diff.session_b}: ${diff.node_count_b} nodes`);
+  lines.push("");
+
+  if (diff.added_nodes.length > 0) {
+    lines.push(`### Added in B (${diff.added_nodes.length})`);
+    for (const n of diff.added_nodes) lines.push(`- ${n}`);
+    lines.push("");
+  }
+  if (diff.removed_nodes.length > 0) {
+    lines.push(`### Removed in B (${diff.removed_nodes.length})`);
+    for (const n of diff.removed_nodes) lines.push(`- ${n}`);
+    lines.push("");
+  }
+  if (diff.modified_nodes.length > 0) {
+    lines.push(`### Modified (${diff.modified_nodes.length})`);
+    for (const n of diff.modified_nodes) lines.push(`- ${n}`);
+    lines.push("");
+  }
+  if (diff.added_nodes.length === 0 && diff.removed_nodes.length === 0 && diff.modified_nodes.length === 0) {
+    lines.push("Sessions are identical.");
+  }
+  return lines.join("\n");
 }
 
 // ============================================================================

@@ -7,6 +7,8 @@ export interface ValidationIssue {
   node_id: string;
   node_type: string;
   message: string;
+  suggestion?: string;
+  auto_fix?: unknown; // modify_workflow operation to fix the issue
 }
 
 export interface ValidationResult {
@@ -66,11 +68,15 @@ export async function validateWorkflow(
     const requiredInputs = nodeDef.input?.required ?? {};
     for (const [inputName, inputSpec] of Object.entries(requiredInputs)) {
       if (!(inputName in node.inputs)) {
+        // Generate fix suggestion
+        const fixOp = generateFixForMissingInput(nodeId, classType, inputName, inputSpec, workflow, objectInfo);
         issues.push({
           severity: "error",
           node_id: nodeId,
           node_type: classType,
           message: `Missing required input "${inputName}"`,
+          suggestion: fixOp?.suggestion ?? `Add "${inputName}" input to node ${nodeId}`,
+          auto_fix: fixOp?.auto_fix,
         });
       }
     }
@@ -164,6 +170,62 @@ export async function validateWorkflow(
     : `Workflow has ${errors.length} error(s) and ${warnings.length} warning(s)`;
 
   return { valid, issues, summary };
+}
+
+/**
+ * Generate fix suggestion for a missing required input.
+ */
+function generateFixForMissingInput(
+  nodeId: string,
+  classType: string,
+  inputName: string,
+  inputSpec: unknown,
+  workflow: WorkflowJSON,
+  objectInfo: ObjectInfo,
+): { suggestion: string; auto_fix?: unknown } | null {
+  const inputType = Array.isArray(inputSpec) ? (inputSpec[0] as string[] | undefined) : undefined;
+  if (!inputType || !Array.isArray(inputType[0])) {
+    // Not a connection-type input, need default value instead
+    const defaultValue = Array.isArray(inputSpec) ? inputSpec[1]?.default : undefined;
+    return {
+      suggestion: `Set "${inputName}" on node ${nodeId} to a valid value`,
+      auto_fix: defaultValue !== undefined ? {
+        op: "set_input",
+        node_id: nodeId,
+        input_name: inputName,
+        value: defaultValue,
+      } : undefined,
+    };
+  }
+
+  // It's a connection-type input (e.g. ["MODEL"], ["CLIP"])
+  const expectedType = inputType[0];
+
+  // Search for a node that outputs this type
+  for (const [srcId, srcNode] of Object.entries(workflow)) {
+    if (srcId === nodeId) continue;
+    const srcDef = objectInfo[srcNode.class_type];
+    if (!srcDef || !srcDef.output) continue;
+
+    for (let outIdx = 0; outIdx < srcDef.output.length; outIdx++) {
+      if (srcDef.output[outIdx] === expectedType) {
+        return {
+          suggestion: `Connect node ${srcId} output ${outIdx} (${expectedType}) to node ${nodeId} input "${inputName}"`,
+          auto_fix: {
+            op: "connect",
+            source_id: srcId,
+            output_index: outIdx,
+            target_id: nodeId,
+            input_name: inputName,
+          },
+        };
+      }
+    }
+  }
+
+  return {
+    suggestion: `No node found that outputs "${expectedType}". You may need to add a loader node first.`,
+  };
 }
 
 /**

@@ -1,9 +1,11 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { WorkflowJSON } from "../comfyui/types.js";
 import {
   enqueueWorkflow,
   getSystemInfo,
 } from "../services/workflow-executor.js";
+import { getSessionWorkflow } from "../services/template-manager.js";
 import { errorToToolResult } from "../utils/errors.js";
 import { getTracker } from "../services/generation-tracker.js";
 import { extractSettings } from "../services/workflow-settings-extractor.js";
@@ -51,6 +53,64 @@ export function registerWorkflowExecuteTools(server: McpServer): void {
                   status: "enqueued",
                   prompt_id: result.prompt_id,
                   queue_remaining: result.queue_remaining,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return errorToToolResult(err);
+      }
+    },
+  );
+
+  server.tool(
+    "run_workflow",
+    "Execute a session's workflow. Fetches the workflow from the session, validates it, randomizes seeds, and submits to ComfyUI. This is the Session-oriented way to run workflows — use this instead of enqueue_workflow when you have a session_id.",
+    {
+      session_id: z.string().describe("Session ID to execute (from select_template, load_workflow, or fork_session)"),
+      disable_random_seed: z.boolean().optional().describe("If true, do not randomize seed values"),
+    },
+    async ({ session_id, disable_random_seed }) => {
+      try {
+        const workflow = getSessionWorkflow(session_id);
+        if (!workflow) {
+          return {
+            content: [{ type: "text" as const, text: `Session not found: ${session_id}` }],
+          };
+        }
+
+        const wf = workflow as WorkflowJSON;
+        const result = await enqueueWorkflow(wf, {
+          disable_random_seed,
+        });
+
+        // Log generation settings
+        try {
+          const tracker = getTracker();
+          const settings = await extractSettings(wf, tracker.fileHasher);
+          if (settings) {
+            const { settingsHash, reuseCount } = tracker.logGeneration(settings);
+            logger.info("Generation tracked", { settingsHash, reuseCount });
+          }
+        } catch (trackErr) {
+          logger.warn("Failed to track generation settings", {
+            error: trackErr instanceof Error ? trackErr.message : trackErr,
+          });
+        }
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  status: "enqueued",
+                  prompt_id: result.prompt_id,
+                  queue_remaining: result.queue_remaining,
+                  session_id,
                 },
                 null,
                 2,

@@ -462,6 +462,12 @@ interface AddNodeOp {
   class_type: string;
   inputs?: Record<string, unknown>;
   id?: string;
+  insert_between?: {
+    source_id: string;
+    output_index: number;
+    target_id: string;
+    input_name: string;
+  };
 }
 
 interface RemoveNodeOp {
@@ -477,22 +483,11 @@ interface ConnectOp {
   input_name: string;
 }
 
-interface InsertBetweenOp {
-  op: "insert_between";
-  source_id: string;
-  output_index: number;
-  target_id: string;
-  input_name: string;
-  new_class_type: string;
-  new_inputs?: Record<string, unknown>;
-}
-
 export type ModifyOperation =
   | SetInputOp
   | AddNodeOp
   | RemoveNodeOp
-  | ConnectOp
-  | InsertBetweenOp;
+  | ConnectOp;
 
 function applySetInput(wf: WorkflowJSON, op: SetInputOp): void {
   const node = wf[op.node_id];
@@ -503,10 +498,43 @@ function applySetInput(wf: WorkflowJSON, op: SetInputOp): void {
 function applyAddNode(wf: WorkflowJSON, op: AddNodeOp): string {
   const id = op.id ?? getNextNodeId(wf);
   if (wf[id]) throw new ValidationError(`Node ID "${id}" already exists`);
-  wf[id] = {
-    class_type: op.class_type,
-    inputs: op.inputs ?? {},
-  };
+
+  const newInputs: Record<string, unknown> = { ...(op.inputs ?? {}) };
+
+  // If insert_between is specified, wire the new node between source and target
+  if (op.insert_between) {
+    const { source_id, output_index, target_id, input_name } = op.insert_between;
+    if (!wf[source_id]) throw new ValidationError(`Source node "${source_id}" not found`);
+    if (!wf[target_id]) throw new ValidationError(`Target node "${target_id}" not found`);
+
+    // Connect the new node's primary input to the original source
+    const primaryInputNames = ["model", "clip", "samples", "latent_image", "image", "conditioning", "pixels"];
+    let connected = false;
+    for (const name of primaryInputNames) {
+      if (!(name in newInputs)) {
+        newInputs[name] = [source_id, output_index];
+        connected = true;
+        break;
+      }
+    }
+    if (!connected) {
+      newInputs["input"] = [source_id, output_index];
+    }
+
+    wf[id] = {
+      class_type: op.class_type,
+      inputs: newInputs,
+    };
+
+    // Rewire: target's input now points to the new node's output 0
+    wf[target_id].inputs[input_name] = [id, 0];
+  } else {
+    wf[id] = {
+      class_type: op.class_type,
+      inputs: newInputs,
+    };
+  }
+
   return id;
 }
 
@@ -535,42 +563,6 @@ function applyConnect(wf: WorkflowJSON, op: ConnectOp): void {
   wf[op.target_id].inputs[op.input_name] = [op.source_id, op.output_index];
 }
 
-function applyInsertBetween(wf: WorkflowJSON, op: InsertBetweenOp): string {
-  if (!wf[op.source_id]) throw new ValidationError(`Source node "${op.source_id}" not found`);
-  if (!wf[op.target_id]) throw new ValidationError(`Target node "${op.target_id}" not found`);
-
-  const newId = getNextNodeId(wf);
-  const newInputs: Record<string, unknown> = { ...(op.new_inputs ?? {}) };
-
-  // Connect the new node's first input to the original source
-  // Find the first input name that isn't already set -- use a convention-based approach
-  // The new node receives the source output on its primary input
-  // We'll figure out the right input name by looking for common patterns
-  const primaryInputNames = ["model", "clip", "samples", "latent_image", "image", "conditioning", "pixels"];
-  let connected = false;
-  for (const name of primaryInputNames) {
-    if (!(name in newInputs)) {
-      newInputs[name] = [op.source_id, op.output_index];
-      connected = true;
-      break;
-    }
-  }
-  if (!connected) {
-    // Fallback: add as first unused slot
-    newInputs["input"] = [op.source_id, op.output_index];
-  }
-
-  wf[newId] = {
-    class_type: op.new_class_type,
-    inputs: newInputs,
-  };
-
-  // Rewire: target's input now points to the new node's output 0
-  wf[op.target_id].inputs[op.input_name] = [newId, 0];
-
-  return newId;
-}
-
 export function modifyWorkflow(
   workflow: WorkflowJSON,
   operations: ModifyOperation[],
@@ -595,11 +587,6 @@ export function modifyWorkflow(
       case "connect":
         applyConnect(wf, op);
         break;
-      case "insert_between": {
-        const id = applyInsertBetween(wf, op);
-        addedIds.push(id);
-        break;
-      }
       default:
         throw new ValidationError(`Unknown operation: ${(op as { op: string }).op}`);
     }

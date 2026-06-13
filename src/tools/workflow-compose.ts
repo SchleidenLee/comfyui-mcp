@@ -28,6 +28,19 @@ const operationSchema = z.discriminatedUnion("op", [
     class_type: z.string(),
     inputs: z.record(z.any()).optional(),
     id: z.string().optional(),
+    insert_between: z
+      .object({
+        source_id: z.string(),
+        output_index: z.number(),
+        target_id: z.string(),
+        input_name: z.string(),
+      })
+      .optional()
+      .describe(
+        "If provided, inserts the new node between source and target: " +
+          "breaks the existing connection, wires the new node's primary input to source, " +
+          "and rewires target's input to the new node's output 0.",
+      ),
   }),
   z.object({
     op: z.literal("remove_node"),
@@ -39,15 +52,6 @@ const operationSchema = z.discriminatedUnion("op", [
     output_index: z.number(),
     target_id: z.string(),
     input_name: z.string(),
-  }),
-  z.object({
-    op: z.literal("insert_between"),
-    source_id: z.string(),
-    output_index: z.number(),
-    target_id: z.string(),
-    input_name: z.string(),
-    new_class_type: z.string(),
-    new_inputs: z.record(z.any()).optional(),
   }),
 ]);
 
@@ -116,13 +120,13 @@ export function registerWorkflowComposeTools(server: McpServer): void {
   // ==========================================================================
   server.tool(
     "modify_workflow",
-    "Apply modification operations to a session's workflow. Supports: set_input, add_node, remove_node, connect, insert_between. Operates on the session identified by session_id, not on raw JSON.",
+    "Apply modification operations to a session's workflow. Supports: set_input, add_node (with optional insert_between), remove_node, connect. Operates on the session identified by session_id, not on raw JSON.",
     {
       session_id: z.string().describe("Session ID (from select_template or create_workflow)"),
       operations: z
         .array(operationSchema)
         .describe(
-          "Array of operations to apply in order. Each has an 'op' field: set_input, add_node, remove_node, connect, or insert_between",
+          "Array of operations to apply in order. Each has an 'op' field: set_input, add_node, remove_node, or connect. Use add_node with insert_between to insert a node between two existing nodes.",
         ),
     },
     async ({ session_id, operations }) => {
@@ -145,8 +149,15 @@ export function registerWorkflowComposeTools(server: McpServer): void {
         // 应用修改
         const result = modifyWorkflow(workflow as WorkflowJSON, operations as ModifyOperation[]);
 
-        // 更新 Session
-        updateSessionWorkflow(session_id, result.workflow as Record<string, unknown>);
+        // 构建操作描述
+        const opDescs = (operations as ModifyOperation[]).map((op) => {
+          const base = `${op.op}`;
+          const detail = "node_id" in op ? op.node_id : ("class_type" in op ? op.class_type : "");
+          return `${base} ${detail}`;
+        }).join("; ");
+
+        // 更新 Session（保存历史）
+        updateSessionWorkflow(session_id, result.workflow as Record<string, unknown>, opDescs);
 
         return {
           content: [

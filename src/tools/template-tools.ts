@@ -16,6 +16,13 @@ import {
   closeSession,
   saveAsTemplate,
   saveAsWorkflow,
+  saveSession,
+  importFromJson,
+  forkSession,
+  getSessionHistory,
+  undoModify,
+  diffSessions,
+  formatDiff,
   refreshTemplates,
 } from "../services/template-manager.js";
 import { logger } from "../utils/logger.js";
@@ -325,97 +332,92 @@ export function registerTemplateTools(server: McpServer): void {
   );
 
   // ==========================================================================
-  // save_template - 保存 Session 为个性化模板
+  // save_session - 统一保存工具（模板/工作流 + 嵌套路径）
   // ==========================================================================
   server.tool(
-    "save_template",
-    "Save a session as a reusable custom template. The template will be saved to data/templates/custom/ and will be available in future list_templates calls.",
+    "save_session",
+    "Save a session as a template or workflow. Supports nested subdirectories (e.g., 'pony/lora_v1'). Use this instead of save_session_as_template/save_session_as_workflow.",
     {
       session_id: z.string().describe("Session ID to save"),
-      name: z
-        .string()
-        .describe("Template name (will be converted to a slug for the file name)"),
+      name: z.string().describe("Save name (will be converted to slug for file name)"),
+      save_as: z.enum(["template", "workflow"]).describe("Save as 'template' (reusable) or 'workflow' (finished)"),
+      path: z.string().optional().describe("Nested subdirectory path (e.g., 'pony/lora'). Creates directories if they don't exist."),
+      sync_to_webui: z.boolean().optional().describe("If true, also save to ComfyUI WebUI user library (workflow only)"),
     },
-    async ({ session_id, name }) => {
+    async ({ session_id, name, save_as, path, sync_to_webui }) => {
       const session = getSession(session_id);
       if (!session) {
         return {
-          content: [
-            {
-              type: "text",
-              text: `Session not found: ${session_id}`,
-            },
-          ],
+          content: [{ type: "text", text: `Session not found: ${session_id}` }],
         };
       }
 
       try {
-        const result = await saveAsTemplate(session_id, name);
+        const result = await saveSession(session_id, name, {
+          save_as,
+          sub_path: path,
+          sync_to_webui,
+        });
+
+        const lines = [`Saved as ${save_as}: **${result.name}**`, `File: ${result.file_path}`];
+        if (result.webui_path) {
+          lines.push(`ComfyUI WebUI: ${result.webui_path}`);
+        }
         return {
-          content: [
-            {
-              type: "text",
-              text: `Saved as template: **${result.id}**\nFile: ${result.file_path}`,
-            },
-          ],
+          content: [{ type: "text", text: lines.join("\n") }],
         };
       } catch (err) {
         return {
-          content: [
-            {
-              type: "text",
-              text: `Error: ${err instanceof Error ? err.message : String(err)}`,
-            },
-          ],
+          content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
         };
       }
     },
   );
 
   // ==========================================================================
-  // save_workflow - 保存 Session 为个性化工作流
+  // save_session_as_template - 兼容旧版（已弃用，指向 save_session）
   // ==========================================================================
   server.tool(
-    "save_workflow",
-    "Save a session as a workflow file in data/workflows/. This is for saving finished workflows, not reusable templates.",
+    "save_session_as_template",
+    "DEPRECATED: Use save_session instead. Save a session as a reusable custom template.",
     {
       session_id: z.string().describe("Session ID to save"),
-      name: z
-        .string()
-        .describe("Workflow name (will be converted to a slug for the file name)"),
+      name: z.string().describe("Template name"),
     },
     async ({ session_id, name }) => {
       const session = getSession(session_id);
       if (!session) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Session not found: ${session_id}`,
-            },
-          ],
-        };
+        return { content: [{ type: "text", text: `Session not found: ${session_id}` }] };
       }
+      try {
+        const result = await saveAsTemplate(session_id, name);
+        return { content: [{ type: "text", text: `Saved as template: **${result.id}**\nFile: ${result.file_path}` }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    },
+  );
 
+  // ==========================================================================
+  // save_session_as_workflow - 兼容旧版（已弃用，指向 save_session）
+  // ==========================================================================
+  server.tool(
+    "save_session_as_workflow",
+    "DEPRECATED: Use save_session instead. Save a session as a workflow file.",
+    {
+      session_id: z.string().describe("Session ID to save"),
+      name: z.string().describe("Workflow name"),
+    },
+    async ({ session_id, name }) => {
+      const session = getSession(session_id);
+      if (!session) {
+        return { content: [{ type: "text", text: `Session not found: ${session_id}` }] };
+      }
       try {
         const result = await saveAsWorkflow(session_id, name);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Saved as workflow: **${name}**\nFile: ${result.file_path}`,
-            },
-          ],
-        };
+        return { content: [{ type: "text", text: `Saved as workflow: **${name}**\nFile: ${result.file_path}` }] };
       } catch (err) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error: ${err instanceof Error ? err.message : String(err)}`,
-            },
-          ],
-        };
+        return { content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
       }
     },
   );
@@ -437,6 +439,144 @@ export function registerTemplateTools(server: McpServer): void {
           },
         ],
       };
+    },
+  );
+
+  // ==========================================================================
+  // import_workflow_from_json - 从 JSON 导入工作流
+  // ==========================================================================
+  server.tool(
+    "import_workflow_from_json",
+    "Import a workflow JSON (e.g., downloaded from the web) and save it as a session, template, or workflow. Supports UI and API format auto-detection.",
+    {
+      workflow_json: z.string().describe("Complete workflow JSON string (UI or API format)"),
+      name: z.string().describe("Name for the imported workflow"),
+      save_as: z.enum(["session", "template", "workflow"]).describe("How to save: 'session' (editable), 'template' (reusable), or 'workflow' (finished)"),
+      path: z.string().optional().describe("Subdirectory path (e.g., 'downloads/pony')"),
+    },
+    async ({ workflow_json, name, save_as, path }) => {
+      try {
+        const imported = await importFromJson(workflow_json, name, {
+          save_as,
+          sub_path: path,
+        });
+        const lines = [`Imported: **${imported.name}**`, `File: ${imported.file_path}`];
+        if (imported.session_id) {
+          lines.push(`Session ID: ${imported.session_id}`);
+        }
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    },
+  );
+
+  // ==========================================================================
+  // fork_session - 基于现有 Session 创建分支
+  // ==========================================================================
+  server.tool(
+    "fork_session",
+    "Create a new session as a copy/branch of an existing session. Use this to try different modifications without affecting the original.",
+    {
+      session_id: z.string().describe("Source session ID to fork from"),
+      name: z.string().optional().describe("Optional name for the new branch (defaults to auto-generated ID)"),
+    },
+    async ({ session_id, name }) => {
+      const session = getSession(session_id);
+      if (!session) {
+        return { content: [{ type: "text", text: `Session not found: ${session_id}` }] };
+      }
+      try {
+        const forked = await forkSession(session_id, name);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Forked session: **${forked.session_id}**\nSource: ${session_id}\nNodes: ${Object.keys(forked.workflow).length}`,
+            },
+          ],
+        };
+      } catch (err) {
+        return { content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    },
+  );
+
+  // ==========================================================================
+  // get_session_history - 查看 Session 操作历史
+  // ==========================================================================
+  server.tool(
+    "get_session_history",
+    "View the modification history of a session. Shows all operations applied since creation.",
+    {
+      session_id: z.string().describe("Session ID to view history for"),
+    },
+    async ({ session_id }) => {
+      const history = getSessionHistory(session_id);
+      if (!history) {
+        return { content: [{ type: "text", text: `Session not found: ${session_id}` }] };
+      }
+      if (history.length === 0) {
+        return { content: [{ type: "text", text: "No modifications recorded for this session." }] };
+      }
+      const lines = history.map((h, i) => {
+        const time = new Date(h.timestamp).toLocaleTimeString();
+        return `${i + 1}. [${time}] ${h.operation}`;
+      });
+      return {
+        content: [{ type: "text", text: `## Session History (${history.length} operations)\n\n${lines.join("\n")}` }],
+      };
+    },
+  );
+
+  // ==========================================================================
+  // undo_modify - 回退上一次修改
+  // ==========================================================================
+  server.tool(
+    "undo_modify",
+    "Undo the last modification to a session. Restores the session to its previous state.",
+    {
+      session_id: z.string().describe("Session ID to undo"),
+    },
+    async ({ session_id }) => {
+      const session = getSession(session_id);
+      if (!session) {
+        return { content: [{ type: "text", text: `Session not found: ${session_id}` }] };
+      }
+      try {
+        const result = await undoModify(session_id);
+        return {
+          content: [{ type: "text", text: `Undo successful. Session ${session_id} restored to previous state.\nNodes: ${result.node_count}` }],
+        };
+      } catch (err) {
+        return { content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
+    },
+  );
+
+  // ==========================================================================
+  // diff_sessions - 对比两个 Session 的差异
+  // ==========================================================================
+  server.tool(
+    "diff_sessions",
+    "Compare two sessions and show differences in node count, parameters, and connections.",
+    {
+      session_a: z.string().describe("First session ID"),
+      session_b: z.string().describe("Second session ID"),
+    },
+    async ({ session_a, session_b }) => {
+      const sessionA = getSession(session_a);
+      const sessionB = getSession(session_b);
+      if (!sessionA) return { content: [{ type: "text", text: `Session not found: ${session_a}` }] };
+      if (!sessionB) return { content: [{ type: "text", text: `Session not found: ${session_b}` }] };
+      try {
+        const diff = diffSessions(session_a, session_b);
+        return {
+          content: [{ type: "text", text: formatDiff(diff) }],
+        };
+      } catch (err) {
+        return { content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
+      }
     },
   );
 }
