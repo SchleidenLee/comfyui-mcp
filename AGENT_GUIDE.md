@@ -680,24 +680,36 @@ fork_session("sess_abc123", "v2尝试")
 
 ### 20. view_image
 
-查看生成的图片（通过 asset_id）。
+获取资产图片并保存到本地，返回文件路径（Windows + WSL）及元信息。**不返回 base64**，不会炸上下文。
 
 **参数**:
-- `asset_id` (必需)
+- `asset_id` (必需): 生成任务返回的资产 ID
 
-**返回**: 内联图片内容块
+**返回示例**:
+```
+Asset: asset_xxx
+Image: ComfyUI_00001_.png
+Windows path: X:\projects\comfyui-mcp\ComfyUI_00001_.png
+WSL path: /mnt/x/projects/comfyui-mcp/ComfyUI_00001_.png
+MIME type: image/png
+File size: 245.3 KB
+Modified: 2026-06-13T...
+Dimensions: 1024x1024
+```
 
 ---
 
 ### 21. get_image
 
-从 ComfyUI 获取输出图片并保存到本地。
+通过文件名从 ComfyUI 获取图片，保存到本地，返回文件路径（Windows + WSL）及元信息。**不返回 base64**。
 
 **参数**:
-- `filename` (必需): 输出文件名
+- `filename` (必需): 输出文件名（如 `ComfyUI_00001_.png`）
 - `type` (可选): `output` / `input` / `temp`（默认 `output`）
 - `subfolder` (可选): 子文件夹
-- `save_dir` (可选): 保存目录
+- `save_dir` (可选): 本地保存目录（默认当前工作目录）
+
+**返回示例**: 同 `view_image`
 
 ---
 
