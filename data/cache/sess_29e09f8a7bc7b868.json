@@ -1,0 +1,207 @@
+{
+  "id": "sess_29e09f8a7bc7b868",
+  "source_type": "template",
+  "source_id": "txt2img",
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(exhausted young chinese woman face close-up:1.5), (swollen red lips from rough oral sex:1.4), (puffy tear-stained eyes:1.4), (messy black hair sticking to sweaty forehead:1.3), (flushed cheeks with visible pores and sweat droplets:1.4), (bruised neck with purple finger marks:1.5), (tired hollow dark circles under eyes:1.3), (slightly parted mouth breathing heavily, saliva on chin:1.3), (realistic skin texture with blemishes:1.4), (subtle tear tracks mixed with sweat:1.3), (post-orgasm dazed expression:1.5), (used and claimed look, vacant stare:1.4), extreme close-up portrait, photorealistic, 85mm lens, f/1.8, dramatic side lighting, harsh shadows, raw unedited photo",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 1024,
+        "batch_size": 1,
+        "text": "caucasian, blonde, western, cartoon, anime, 2d, illustration, heavy makeup, perfect smooth skin, clean fresh face, happy smiling expression, beauty shot, studio lighting, airbrushed, filtered, glamorous, model pose"
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 35,
+        "cfg": 6,
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "karras",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    }
+  },
+  "created_at": 1781328458621,
+  "last_modified": 1781328614571,
+  "previous_workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(exhausted asian woman face:1.3), (swollen lips from deepthroat:1.4), (red puffy eyes after crying:1.3), (messy disheveled hair:1.2), (flushed cheeks with sweat:1.3), (bruised neck with finger marks:1.4), (tired hollow eyes:1.3), (slightly parted mouth breathing heavily:1.2), (realistic skin texture with pores:1.3), (subtle tear tracks on face:1.2), (post-orgasm expression:1.4), (used and claimed look:1.3), close-up portrait, photorealistic, 85mm lens, f/1.8, dramatic lighting, harsh shadows",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 1024,
+        "batch_size": 1,
+        "text": "cartoon, anime, 2d, illustration, makeup, perfect skin, clean face, happy expression, smiling, beauty shot, studio lighting, airbrushed, filtered, smooth skin"
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 35,
+        "cfg": 6,
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "karras",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": 1781328466073,
+      "operation": "set_input 3; set_input 4"
+    },
+    {
+      "timestamp": 1781328485352,
+      "operation": "set_input 1"
+    },
+    {
+      "timestamp": 1781328614571,
+      "operation": "set_input 3; set_input 4"
+    }
+  ]
+}

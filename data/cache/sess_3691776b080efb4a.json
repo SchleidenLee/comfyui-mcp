@@ -1,0 +1,264 @@
+{
+  "id": "sess_3691776b080efb4a",
+  "source_type": "template",
+  "source_id": "txt2img",
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "beautiful asian woman, sitting on heels, feet focus, soles, realistic skin texture, professional photography, 8k, sharp focus",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "bad anatomy, deformed, ugly, cartoon, anime",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 1024,
+        "batch_size": 1,
+        "model": null
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "8",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": -1,
+        "steps": 35,
+        "cfg": 6.5,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1,
+        "clip": null
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "add-detail-xl.safetensors",
+        "model": [
+          "1",
+          0
+        ],
+        "strength_clip": 0.8,
+        "strength_model": 0.8
+      }
+    }
+  },
+  "created_at": 1781292654582,
+  "last_modified": 1781292785288,
+  "previous_workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "beautiful asian woman, sitting on heels, feet focus, soles, realistic skin texture, professional photography, 8k, sharp focus",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "bad anatomy, deformed, ugly, cartoon, anime",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 1024,
+        "batch_size": 1,
+        "model": null
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "8",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": -1,
+        "steps": 35,
+        "cfg": 6.5,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1,
+        "clip": [
+          "8",
+          1
+        ]
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "add-detail-xl.safetensors",
+        "model": [
+          "1",
+          0
+        ],
+        "strength_clip": 0.8,
+        "strength_model": 0.8
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": 1781292664910,
+      "operation": "add_node LoraLoader"
+    },
+    {
+      "timestamp": 1781292669018,
+      "operation": "connect ; connect "
+    },
+    {
+      "timestamp": 1781292676150,
+      "operation": "set_input 1"
+    },
+    {
+      "timestamp": 1781292680686,
+      "operation": "set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781292709068,
+      "operation": "set_input 4; set_input 2"
+    },
+    {
+      "timestamp": 1781292714532,
+      "operation": "connect ; connect "
+    },
+    {
+      "timestamp": 1781292747163,
+      "operation": "connect ; connect "
+    },
+    {
+      "timestamp": 1781292785288,
+      "operation": "set_input 5; connect ; connect "
+    }
+  ]
+}

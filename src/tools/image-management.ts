@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { writeFile, mkdir } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { writeFile, mkdir, stat } from "node:fs/promises";
+import { join, basename, resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   extractWorkflowFromImage,
@@ -12,14 +12,69 @@ import {
 } from "../services/image-management.js";
 import { errorToToolResult } from "../utils/errors.js";
 
+/**
+ * Convert a Windows absolute path to WSL /mnt/ form.
+ * Example: "X:\\AI\\projects\\foo.png" → "/mnt/x/AI/projects/foo.png"
+ */
+function toWslPath(winPath: string): string {
+  const m = winPath.match(/^([A-Za-z]):\\(.*)$/);
+  if (!m) return winPath;
+  const drive = m[1].toLowerCase();
+  const rest = m[2].replace(/\\/g, "/");
+  return `/mnt/${drive}/${rest}`;
+}
+
+interface ImageDimensions {
+  width: number;
+  height: number;
+}
+
+/**
+ * Parse image dimensions from binary data.
+ * Supports PNG (IHDR) and JPEG (SOF0/SOF2).
+ */
+function getImageDimensions(data: Buffer): ImageDimensions | undefined {
+  // PNG: signature 8 bytes, then IHDR chunk
+  const PNG_SIG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (data.length >= 24 && data.subarray(0, 8).equals(PNG_SIG)) {
+    const width = data.readUInt32BE(16);
+    const height = data.readUInt32BE(20);
+    return { width, height };
+  }
+
+  // JPEG: scan for SOF0 (0xFFC0) or SOF2 (0xFFC2) markers
+  if (data.length > 2 && data[0] === 0xff && data[1] === 0xd8) {
+    let offset = 2;
+    while (offset < data.length - 9) {
+      if (data[offset] !== 0xff) { offset++; continue; }
+      const marker = data[offset + 1];
+      if (marker === 0xd9) break; // EOI
+      if (marker === 0x00 || (marker >= 0x01 && marker <= 0x09) || (marker >= 0xd0 && marker <= 0xd9)) {
+        offset += 2;
+        continue;
+      }
+      const len = data.readUInt16BE(offset + 2);
+      if (marker === 0xc0 || marker === 0xc2) {
+        return {
+          height: data.readUInt16BE(offset + 5),
+          width: data.readUInt16BE(offset + 7),
+        };
+      }
+      offset += 2 + len;
+    }
+  }
+
+  return undefined;
+}
+
 export function registerImageManagementTools(server: McpServer): void {
   // ── get_image ────────────────────────────────────────────────────────────
   // Fetches a generated image from ComfyUI via HTTP /view.
   // Works with remote ComfyUI — no COMFYUI_PATH required.
   server.tool(
     "get_image",
-    "Fetch a generated image from ComfyUI and return it as an inline image. " +
-      "Works with remote ComfyUI instances — does not require COMFYUI_PATH. " +
+    "Fetch a generated image from ComfyUI and return its local file path " +
+      "(Windows + WSL formats) plus metadata. Does not return base64. " +
       "Use get_history first to obtain the filename.",
     {
       filename: z
@@ -39,7 +94,7 @@ export function registerImageManagementTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "Local directory to save the image file. Defaults to /tmp/comfyui-images/.",
+          "Local directory to save the image file. Defaults to current working directory.",
         ),
     },
     async (args) => {
@@ -51,24 +106,29 @@ export function registerImageManagementTools(server: McpServer): void {
         );
 
         // Save to local file
-        const saveDir = args.save_dir ?? process.cwd();
+        const saveDir = args.save_dir ? resolve(args.save_dir) : resolve(process.cwd());
         await mkdir(saveDir, { recursive: true });
         const localFilename = basename(args.filename);
         const savePath = join(saveDir, localFilename);
-        await writeFile(savePath, Buffer.from(base64, "base64"));
+        const data = Buffer.from(base64, "base64");
+        await writeFile(savePath, data);
+
+        const fileInfo = await stat(savePath);
+        const dims = getImageDimensions(data);
+        const wslPath = toWslPath(savePath);
+
+        let metaText = `Image: ${localFilename}`;
+        metaText += `\nWindows path: ${savePath}`;
+        metaText += `\nWSL path: ${wslPath}`;
+        metaText += `\nMIME type: ${mimeType}`;
+        metaText += `\nFile size: ${(fileInfo.size / 1024).toFixed(1)} KB`;
+        metaText += `\nModified: ${fileInfo.mtime.toISOString()}`;
+        if (dims) {
+          metaText += `\nDimensions: ${dims.width}x${dims.height}`;
+        }
 
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Saved to: ${savePath}`,
-            },
-            {
-              type: "image" as const,
-              data: base64,
-              mimeType,
-            },
-          ],
+          content: [{ type: "text" as const, text: metaText }],
         };
       } catch (err) {
         return errorToToolResult(err);

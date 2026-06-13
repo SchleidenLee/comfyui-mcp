@@ -1,0 +1,277 @@
+{
+  "id": "sess_edeb311739a81b76",
+  "source_type": "template",
+  "source_id": "txt2img",
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(masterpiece, best quality:1.3), photorealistic, pov, oral sex, fellatio, she is sucking a man's penis, asian woman deeply engulfing large black dick, lips stretched wide around shaft, vacuum seal, sloppy wet mouth, ropy saliva strings dripping from chin, glistening glans with precum, tongue pressing against frenulum, eyes rolling back, flushed cheeks, messy hair, dim bedroom lighting, warm tone, f/2.8, shallow depth of field, anatomical accuracy, no face distortion, no extra fingers",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(worst quality, low quality:1.4), deformed, bad anatomy, extra limbs, missing fingers, cartoon, anime, illustration",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 35,
+        "cfg": 6.5,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1,
+        "model": [
+          "8",
+          0
+        ]
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "pov oral sex-SDXL-V1.safetensors",
+        "strength_model": 0.8,
+        "strength_clip": 0.8
+      }
+    }
+  },
+  "created_at": 1781294215228,
+  "last_modified": 1781295781562,
+  "previous_workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(masterpiece, best quality:1.3), photorealistic, pov, oral sex, fellatio, she is sucking a man's penis, asian woman with tongue fully extended out of mouth, large black penis pressing against tongue tip, penis shaft visible in foreground, close-up shot, lips parted wide, saliva coating both tongue and penis, eyes looking at viewer, messy hair, realistic skin texture, warm studio lighting, f/4.0, moderate depth of field, anatomical accuracy, no face distortion, no extra fingers",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(worst quality, low quality:1.4), deformed, bad anatomy, extra limbs, missing fingers, cartoon, anime, illustration",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 35,
+        "cfg": 6.5,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1,
+        "model": [
+          "8",
+          0
+        ]
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "pov oral sex-SDXL-V1.safetensors",
+        "strength_model": 0.8,
+        "strength_clip": 0.8
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": 1781294225870,
+      "operation": "set_input 1; set_input 2; set_input 3; set_input 4; set_input 4; set_input 5; set_input 5"
+    },
+    {
+      "timestamp": 1781294298158,
+      "operation": "set_input 2"
+    },
+    {
+      "timestamp": 1781294370879,
+      "operation": "set_input 2"
+    },
+    {
+      "timestamp": 1781294552901,
+      "operation": "set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781294704037,
+      "operation": "add_node LoraLoader; connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781294824079,
+      "operation": "remove_node 8; add_node LoraLoader; add_node LoraLoader; connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781294834579,
+      "operation": "set_input 2"
+    },
+    {
+      "timestamp": 1781295102292,
+      "operation": "remove_node 8; remove_node 9; add_node LoraLoader; add_node LoraLoader; connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781295110342,
+      "operation": "set_input 2"
+    },
+    {
+      "timestamp": 1781295197162,
+      "operation": "remove_node 8; remove_node 9; add_node LoraLoader; add_node LoraLoader; connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781295607576,
+      "operation": "remove_node 8; remove_node 9; add_node LoraLoader; connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781295636743,
+      "operation": "set_input 2"
+    },
+    {
+      "timestamp": 1781295781562,
+      "operation": "set_input 2"
+    }
+  ]
+}

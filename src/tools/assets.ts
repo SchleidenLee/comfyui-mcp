@@ -22,20 +22,16 @@ function summarizeRecord(record: ReturnType<typeof AssetRegistry.get>) {
 export function registerAssetTools(server: McpServer): void {
   server.tool(
     "view_image",
-    "Fetch a registered asset's bytes and return them as an inline image so the agent can see the result. Use this after enqueue_workflow completes (asset_id is included in the completion notification) to inspect, critique, or compare generated images. Only supports image mime types (PNG/JPEG/WebP); audio/video assets must be saved to disk via get_image.",
+    "Fetch a registered asset's image, save it locally, and return the file path " +
+      "(Windows + WSL formats) plus metadata. Does not return base64. " +
+      "Use this after enqueue_workflow completes to inspect generated images.",
     {
       asset_id: z.string().describe("Asset id returned by list_assets or job completion"),
     },
     async ({ asset_id }) => {
       try {
         const result = await viewAssetImage(asset_id);
-        return {
-          content: result.content.map((block) =>
-            block.type === "image"
-              ? { type: "image" as const, data: block.data, mimeType: block.mimeType }
-              : { type: "text" as const, text: block.text },
-          ),
-        };
+        return result;
       } catch (err) {
         return errorToToolResult(err);
       }

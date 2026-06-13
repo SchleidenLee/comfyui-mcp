@@ -1,0 +1,281 @@
+{
+  "id": "sess_4566aee3867e854f",
+  "source_type": "template",
+  "source_id": "txt2img",
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(M-leg position, legs spread wide apart, knees bent outward:1.5), (oiled glistening foot soles in foreground, high gloss reflection:1.4), (swollen everted labia minora visible between thighs, dark hyperpigmented:1.4), (clear viscous lubricant fluid on feet and vulva:1.3), (slim delicate asian female body, slender thighs, narrow waist:1.4), (realistic skin texture with pores and sweat droplets:1.3), (post-orgasm used claimed look:1.3), intimate close-up from below, photorealistic, 85mm lens, f/2.8, warm dramatic lighting, shallow depth of field",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "cartoon, anime, 2d, illustration, clean shaved, smooth pink vulva, closed labia, muscular legs, athletic feet, studio lighting, airbrushed, fat, overweight, chubby",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 832,
+        "height": 1216,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 35,
+        "cfg": 5.5,
+        "sampler_name": "dpmpp_2m_sde",
+        "scheduler": "karras",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "pov oral sex-SDXL-V1.safetensors",
+        "strength_model": 0.5,
+        "strength_clip": 0.5
+      }
+    }
+  },
+  "created_at": 1781329279937,
+  "last_modified": 1781330778967,
+  "previous_workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(pov from above looking down:1.4), (exhausted young chinese woman performing oral sex in dirty public bathroom:1.5), (large black penis fully inside mouth, lips wrapped tightly around shaft:1.5), (sloppy wet mouth, ropy saliva dripping from chin:1.4), (swollen glossy red lips, natural flush:1.3), (half-closed glazed eyes looking up at viewer:1.4), (messy disheveled hair sticking to sweaty forehead:1.3), (dirty bathroom tiles background, harsh fluorescent lighting, urine stains on wall:1.4), (oral sex, fellatio, she is sucking a man's penis, pov, veins, looking at viewer:1.0), photorealistic, raw unedited, 85mm lens, f/1.8",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "cartoon, anime, 2d, illustration, clean, perfect skin, studio lighting, makeup, smiling, happy, caucasian, blonde",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 832,
+        "height": 1216,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 35,
+        "cfg": 5.5,
+        "sampler_name": "dpmpp_2m_sde",
+        "scheduler": "karras",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "pov oral sex-SDXL-V1.safetensors",
+        "strength_model": 0.5,
+        "strength_clip": 0.5
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": 1781329294040,
+      "operation": "set_input 1; set_input 2; set_input 3; set_input 4; set_input 4; set_input 5; set_input 5; set_input 5; set_input 5; add_node FreeVRAM"
+    },
+    {
+      "timestamp": 1781329333775,
+      "operation": "remove_node 8"
+    },
+    {
+      "timestamp": 1781329436882,
+      "operation": "set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330096857,
+      "operation": "set_input 4; set_input 4; set_input 5; set_input 5"
+    },
+    {
+      "timestamp": 1781330158550,
+      "operation": "set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330180378,
+      "operation": "add_node LoraLoader; connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781330247387,
+      "operation": "connect ; connect ; connect ; set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330311210,
+      "operation": "set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330374535,
+      "operation": "set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330446209,
+      "operation": "set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330544985,
+      "operation": "set_input 1; set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330623833,
+      "operation": "set_input 1; connect ; connect ; set_input 8; set_input 8; set_input 8; set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330698064,
+      "operation": "set_input 1; connect ; connect ; set_input 8; set_input 8; set_input 8; set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781330778967,
+      "operation": "connect ; connect ; connect ; set_input 2; set_input 3"
+    }
+  ]
+}

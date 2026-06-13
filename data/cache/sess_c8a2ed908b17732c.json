@@ -1,0 +1,237 @@
+{
+  "id": "sess_c8a2ed908b17732c",
+  "source_type": "template",
+  "source_id": "txt2img",
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "extreme closeup, huge bbc, penis, dick, dark brown skin #3C2415, thick veins, glistening wet, precum dripping, realistic human flesh, professional photography, 8k, sharp focus, warm tone, detailed skin pores, natural lighting, no face shown",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "face, person, cartoon, anime, mushroom, fungus, plant, deformed, bad anatomy, blurry",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "8",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": -1,
+        "steps": 40,
+        "cfg": 6.5,
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "karras",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "Solo_DickPenis-000002.safetensors",
+        "model": [
+          "1",
+          0
+        ],
+        "strength_clip": 0.7,
+        "strength_model": 0.7
+      }
+    }
+  },
+  "created_at": 1781293098752,
+  "last_modified": 1781293165140,
+  "previous_workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "extreme closeup, huge bbc, dark brown skin #3C2415, thick veins, glistening wet, precum dripping, realistic human flesh, professional photography, 8k, sharp focus, warm tone, detailed skin pores, natural lighting, no face shown",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "face, person, cartoon, anime, mushroom, fungus, plant, deformed, bad anatomy, blurry",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "8",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": -1,
+        "steps": 40,
+        "cfg": 6.5,
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "karras",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "BBC_XL.safetensors",
+        "model": [
+          "1",
+          0
+        ],
+        "strength_clip": 0.7,
+        "strength_model": 0.7
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": 1781293106281,
+      "operation": "set_input 1; set_input 2; set_input 3; add_node LoraLoader"
+    },
+    {
+      "timestamp": 1781293115586,
+      "operation": "connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781293165140,
+      "operation": "set_input 8; set_input 2"
+    }
+  ]
+}

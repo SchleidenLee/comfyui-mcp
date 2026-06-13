@@ -1,0 +1,245 @@
+{
+  "id": "sess_d77d9fce8eea8e6c",
+  "source_type": "template",
+  "source_id": "txt2img",
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(masterpiece, best quality:1.3), photorealistic, 8k, raw photo, 1girl, asian, chinese, beautiful face, long black hair, squatting, legs spread wide, M-legs, from below, low angle, looking up, feet soles facing viewer, barefoot, high arch, glossy skin, oily soles, detailed toes, natural creases, soft plump soles, pussy visible between legs, wet pussy, labia, clitoris, dark background, studio lighting, erotic, fetish, submissive",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "cartoon, anime, drawing, painting, cgi, 3d render, sketch, illustration, deformed, mutated, extra limbs, bad anatomy, bad hands, missing fingers, extra digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, male face, beard, clothes, underwear, shoes, socks, sandals, boots, muscular, bulky, masculine features, closed legs",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 20,
+        "cfg": 8,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1,
+        "model": [
+          "8",
+          0
+        ]
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "lora_name": "add-detail-xl.safetensors",
+        "strength_model": 0.8,
+        "strength_clip": 0.8,
+        "model": [
+          "1",
+          0
+        ],
+        "clip": [
+          "1",
+          1
+        ]
+      }
+    }
+  },
+  "created_at": 1781288629788,
+  "last_modified": 1781290738631,
+  "previous_workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(masterpiece, best quality:1.3), photorealistic, 8k, raw photo, 1girl, asian, chinese, beautiful face, long black hair, squatting, legs spread wide, M-legs, from below, low angle, looking up, feet soles facing viewer, barefoot, high arch, glossy skin, oily soles, detailed toes, natural creases, soft plump soles, pussy visible between legs, wet pussy, labia, clitoris, dark background, studio lighting, erotic, fetish, submissive"
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "cartoon, anime, drawing, painting, cgi, 3d render, sketch, illustration, deformed, mutated, extra limbs, bad anatomy, bad hands, missing fingers, extra digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, male face, beard, clothes, underwear, shoes, socks, sandals, boots, muscular, bulky, masculine features, closed legs"
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 20,
+        "cfg": 8,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "lora_name": "add-detail-xl.safetensors",
+        "strength_model": 0.8,
+        "strength_clip": 0.8,
+        "model": [
+          "1",
+          0
+        ],
+        "clip": [
+          "1",
+          1
+        ]
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": 1781288641225,
+      "operation": "set_input 2; set_input 3"
+    },
+    {
+      "timestamp": 1781288648297,
+      "operation": "add_node LoraLoader"
+    },
+    {
+      "timestamp": 1781288656793,
+      "operation": "connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781288670277,
+      "operation": "set_input 1"
+    },
+    {
+      "timestamp": 1781290712428,
+      "operation": "connect ; connect ; connect ; connect ; connect "
+    },
+    {
+      "timestamp": 1781290728553,
+      "operation": "remove_node 8"
+    },
+    {
+      "timestamp": 1781290734745,
+      "operation": "add_node LoraLoader"
+    },
+    {
+      "timestamp": 1781290738631,
+      "operation": "connect ; connect ; connect "
+    }
+  ]
+}

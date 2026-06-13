@@ -1,0 +1,237 @@
+{
+  "id": "sess_340236014ba7cc0c",
+  "source_type": "template",
+  "source_id": "txt2img",
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(masterpiece, best quality:1.3), photorealistic, pov crotch, from above looking down at kneeling asian woman, extreme close-up on genitals and mouth, unwashed skin, musky body odor visual cue, fresh urine drops on glans, yellowish discoloration, sweaty armpits visible, dirty bathroom tiles background, penis fully inside mouth, lips wrapped tightly around shaft, tongue pressing against glans, sloppy wet mouth, ropy saliva strings dripping, gagging slightly, eyes half-closed in submission, (anatomically correct glans:1.3), (normal coronal ridge:1.2), (proportional glans-to-shaft ratio:1.2), veins, veiny penis, male pubic hair, harsh fluorescent lighting, f/2.8, shallow depth of field",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(worst quality, low quality:1.4), clean, washed, sanitized, perfumed, neat makeup, deformed glans, mushroom head, fused glans and shaft, abnormal corona, distorted penis tip, bad anatomy, extra limbs, cartoon, anime, illustration",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "8",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 35,
+        "cfg": 5.5,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "pov oral sex-SDXL-V1.safetensors",
+        "strength_model": 0.5,
+        "strength_clip": 0.5
+      }
+    }
+  },
+  "created_at": 1781296103534,
+  "last_modified": 1781296416016,
+  "previous_workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(masterpiece, best quality:1.3), photorealistic, pov crotch, from above looking down at kneeling asian woman, extreme close-up on genitals and mouth, unwashed skin, musky body odor visual cue, fresh urine drops on glans, yellowish discoloration, sweaty armpits visible, dirty bathroom tiles background, penis fully inside mouth, lips wrapped tightly around shaft, tongue pressing against glans, sloppy wet mouth, ropy saliva strings dripping, gagging slightly, eyes half-closed in submission, veins, veiny penis, male pubic hair, harsh fluorescent lighting, f/2.8, shallow depth of field, anatomical accuracy",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(worst quality, low quality:1.4), clean, washed, sanitized, perfumed, neat makeup, deformed, bad anatomy, extra limbs, cartoon, anime, illustration",
+        "clip": [
+          "8",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "8",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 35,
+        "cfg": 6.5,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    },
+    "8": {
+      "class_type": "LoraLoader",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "clip": [
+          "1",
+          1
+        ],
+        "lora_name": "pov oral sex-SDXL-V1.safetensors",
+        "strength_model": 0.8,
+        "strength_clip": 0.8
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": 1781296118628,
+      "operation": "set_input 1; add_node LoraLoader; connect ; connect ; connect ; set_input 2; set_input 3; set_input 4; set_input 4; set_input 5; set_input 5"
+    },
+    {
+      "timestamp": 1781296258010,
+      "operation": "set_input 2"
+    },
+    {
+      "timestamp": 1781296416016,
+      "operation": "set_input 8; set_input 8; set_input 2; set_input 3; set_input 5"
+    }
+  ]
+}

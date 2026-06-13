@@ -1,0 +1,201 @@
+{
+  "id": "sess_965cd1b8d9a613ca",
+  "source_type": "template",
+  "source_id": "txt2img",
+  "workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(masterpiece, best quality:1.3), photorealistic, beautiful young asian woman, slim delicate body, graceful figure, sitting on bed in M-leg position, thighs spread wide apart, knees bent outward, lower legs hanging down naturally, extreme close-up on soles of feet facing camera, (oiled soles:1.4), (glistening sweat on feet:1.3), (wet shiny skin:1.2), (high gloss reflection on arches:1.2), detailed foot arch, soft plump soles, rounded toes, natural creases, (anatomically correct toes:1.3), (five distinct toes on each foot:1.2), realistic skin texture, warm studio lighting, f/4.0, moderate depth of field",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(worst quality, low quality:1.4), muscular, bulky, athletic build, thick calves, dragon claws, sharp toes, skinny feet, deformed, bad anatomy, extra limbs, cartoon, anime, illustration, matte skin, dry feet, dull texture, fused toes:1.4, extra toes:1.3, missing toes:1.3, asymmetrical feet:1.2, legs together, knees touching, straight legs, raised legs",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 40,
+        "cfg": 5.5,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    }
+  },
+  "created_at": 1781296599621,
+  "last_modified": 1781296740964,
+  "previous_workflow": {
+    "1": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "juggernautXL_ragnarokBy.safetensors"
+      }
+    },
+    "2": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(masterpiece, best quality:1.3), photorealistic, beautiful young asian woman, slim delicate body, graceful figure, sitting on bed with legs spread M-position, soles of feet facing camera, detailed foot arch, soft plump soles, rounded toes, natural creases, smooth skin, realistic skin texture, warm studio lighting, f/4.0, moderate depth of field, anatomical accuracy, no face distortion, no extra fingers",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Positive Prompt"
+      }
+    },
+    "3": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "text": "(worst quality, low quality:1.4), muscular, bulky, athletic build, thick calves, dragon claws, sharp toes, skinny feet, deformed, bad anatomy, extra limbs, cartoon, anime, illustration",
+        "clip": [
+          "1",
+          1
+        ]
+      },
+      "_meta": {
+        "title": "Negative Prompt"
+      }
+    },
+    "4": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      }
+    },
+    "5": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "1",
+          0
+        ],
+        "positive": [
+          "2",
+          0
+        ],
+        "negative": [
+          "3",
+          0
+        ],
+        "latent_image": [
+          "4",
+          0
+        ],
+        "seed": 12345,
+        "steps": 40,
+        "cfg": 6.5,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1
+      }
+    },
+    "6": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": [
+          "5",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      }
+    },
+    "7": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ],
+        "filename_prefix": "ComfyUI"
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": 1781296611868,
+      "operation": "set_input 1; set_input 2; set_input 3; set_input 4; set_input 4; set_input 5; set_input 5"
+    },
+    {
+      "timestamp": 1781296740964,
+      "operation": "set_input 2; set_input 3; set_input 5"
+    }
+  ]
+}
