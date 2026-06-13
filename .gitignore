@@ -10,6 +10,11 @@ generations.db-shm
 workflows/
 .DS_Store
 
+# Generated during runtime
+ComfyUI_*.png
+data/cache/
+test-mcp-call.mjs
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
