@@ -229,6 +229,64 @@ export async function listOutputImages(options?: {
   return images.slice(0, limit);
 }
 
+export interface InputImage {
+  relative_path: string;
+  size: number;
+  modified: string;
+}
+
+/**
+ * Recursively list images in the ComfyUI input/ directory.
+ * Returns paths relative to the input dir (e.g. "subfolder/image.png").
+ */
+export async function listInputImages(options?: {
+  limit?: number;
+  pattern?: string;
+}): Promise<InputImage[]> {
+  const inputDir = getInputDir();
+  const limit = options?.limit ?? 100;
+  const pattern = options?.pattern?.toLowerCase();
+  const imageExts = new Set([".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"]);
+  const images: InputImage[] = [];
+
+  async function scan(dir: string, prefix: string) {
+    let entries: string[];
+    try {
+      entries = await readdir(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = join(dir, entry);
+      try {
+        const info = await stat(fullPath);
+        if (info.isDirectory()) {
+          await scan(fullPath, prefix ? `${prefix}/${entry}` : entry);
+        } else if (info.isFile()) {
+          const ext = extname(entry).toLowerCase();
+          if (!imageExts.has(ext)) continue;
+          const relPath = prefix ? `${prefix}/${entry}` : entry;
+          if (pattern && !relPath.toLowerCase().includes(pattern)) continue;
+          images.push({
+            relative_path: relPath,
+            size: info.size,
+            modified: info.mtime.toISOString(),
+          });
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  await scan(inputDir, "");
+
+  // Sort newest first
+  images.sort((a, b) => b.modified.localeCompare(a.modified));
+
+  return images.slice(0, limit);
+}
+
 import { fetchImage, uploadImageHttp } from "../comfyui/client.js";
 import { readFile as nodeReadFile } from "node:fs/promises";
 

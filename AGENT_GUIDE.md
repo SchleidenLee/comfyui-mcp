@@ -138,11 +138,13 @@ select  modify  run   save   close
 | [`clear_queue`](#19-clear_queue) | 无 | 清除结果 | 清空所有待执行任务 |
 | [`view_image`](#20-view_image) | `asset_id` | 图片 | 查看生成的图片 |
 
-### 四、图片与资产管理（8 个）
+### 四、图片与资产管理（9 个）
 
 | 工具 | 参数 | 返回 | 用途 |
 |------|------|------|------|
-| [`get_image`](#21-get_image) | `filename`, `type?`, `subfolder?`, `save_dir?` | 图片+保存路径 | 从 ComfyUI 获取输出图片 |
+| [`get_image`](#21-get_image) | `filename`, `type?`, `subfolder?`, `save_dir?` | 本地路径+元信息 | 从 ComfyUI 获取图片到本地 |
+| [`list_output_images`](#21b-list_output_images) | `limit?`, `pattern?` | 图片文件列表 | 列出 output 目录生成的图片 |
+| [`list_input_images`](#21c-list_input_images) | `limit?`, `pattern?` | 相对路径列表 | 列出 input 目录可用图片（含子文件夹） |
 | [`list_assets`](#22-list_assets) | `limit?`, `since?` | 资产列表 | 列出最近生成的资产 |
 | [`get_asset_metadata`](#23-get_asset_metadata) | `asset_id` | 资产元数据+工作流快照 | 查看资产的产生参数 |
 | [`regenerate`](#24-regenerate) | `asset_id`, `overrides?`, `disable_random_seed?` | `prompt_id` | 用相同参数重新生成 |

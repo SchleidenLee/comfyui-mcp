@@ -5,6 +5,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   extractWorkflowFromImage,
   listOutputImages,
+  listInputImages,
   getOutputImage,
   uploadImageAuto,
   uploadVideoAuto,
@@ -305,6 +306,60 @@ export function registerImageManagementTools(server: McpServer): void {
             {
               type: "text" as const,
               text: `Found ${images.length} image(s):\n\n${lines.join("\n")}`,
+            },
+          ],
+        };
+      } catch (err) {
+        return errorToToolResult(err);
+      }
+    },
+  );
+
+  // ── list_input_images ─────────────────────────────────────────────────────
+  server.tool(
+    "list_input_images",
+    "Recursively list image files in ComfyUI's local input/ directory (including subfolders), newest-first, with file size and modification time. Returns relative paths (e.g. 'subfolder/image.png') suitable for LoadImage nodes. Requires COMFYUI_PATH to be set (local installs only). Read-only.",
+    {
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe("Max images to return (default: 100)"),
+      pattern: z
+        .string()
+        .optional()
+        .describe("Filter by relative path pattern (case-insensitive substring match)"),
+    },
+    async (args) => {
+      try {
+        const images = await listInputImages({
+          limit: args.limit,
+          pattern: args.pattern,
+        });
+        if (images.length === 0) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: args.pattern
+                  ? `No input images found matching "${args.pattern}".`
+                  : "No input images found.",
+              },
+            ],
+          };
+        }
+        const lines = images.map((img, i) => {
+          const sizeKB = (img.size / 1024).toFixed(1);
+          const date = new Date(img.modified).toLocaleString();
+          return `${i + 1}. **${img.relative_path}** (${sizeKB} KB) — ${date}`;
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Found ${images.length} input image(s):\n\n${lines.join("\n")}\n\nUse the relative path (e.g. "subfolder/image.png") as the \`image\` input in LoadImage nodes.`,
             },
           ],
         };
