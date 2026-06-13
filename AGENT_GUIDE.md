@@ -120,7 +120,7 @@ select  modify  run   save   close
 
 | 工具 | 参数 | 返回 | 用途 |
 |------|------|------|------|
-| [`modify_workflow`](#9-modify_workflow) | `session_id`, `operations[]` | 修改结果 | 添加/删除节点、建立连接 |
+| [`modify_workflow`](#9-modify_workflow) | `session_id`, `operations[]` | 修改结果 | 添加/删除节点、建立连接、智能插入 |
 | [`run_workflow`](#10-run_workflow) | `session_id` | `prompt_id` | 运行 Session 对应的工作流 |
 | [`validate_workflow`](#11-validate_workflow) | `session_id` 或 `workflow` JSON（二选一） | 验证结果+修复建议 | 执行前检查工作流完整性，返回错误+自动修复建议 |
 | [`refresh_templates`](#12-refresh_templates) | 无 | 刷新结果 | 重新扫描模板目录 |

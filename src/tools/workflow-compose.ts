@@ -147,7 +147,7 @@ export function registerWorkflowComposeTools(server: McpServer): void {
         }
 
         // 应用修改
-        const result = modifyWorkflow(workflow as WorkflowJSON, operations as ModifyOperation[]);
+        const result = await modifyWorkflow(workflow as WorkflowJSON, operations as ModifyOperation[]);
 
         // 构建操作描述
         const opDescs = (operations as ModifyOperation[]).map((op) => {
@@ -159,18 +159,25 @@ export function registerWorkflowComposeTools(server: McpServer): void {
         // 更新 Session（保存历史）
         updateSessionWorkflow(session_id, result.workflow as Record<string, unknown>, opDescs);
 
+        // 构建返回文本
+        const lines = [
+          `Session **${session_id}** modified.`,
+          `New nodes added: ${result.added_ids.length > 0 ? result.added_ids.join(", ") : "none"}`,
+        ];
+
+        if (result.connection_info && result.connection_info.length > 0) {
+          lines.push("", "**Auto-connections:**");
+          for (const conn of result.connection_info) {
+            lines.push(
+              `- Node \`${conn.node_id}\` input \`${conn.input_name}\` ← \`${conn.source_id}\`[${conn.output_index}] (type: \`${conn.matched_type}\`)`,
+            );
+          }
+        }
+
+        lines.push("", "Use `run_workflow` to execute, or apply more modifications.");
+
         return {
-          content: [
-            {
-              type: "text",
-              text: [
-                `Session **${session_id}** modified.`,
-                `New nodes added: ${result.added_ids.length > 0 ? result.added_ids.join(", ") : "none"}`,
-                "",
-                "Use `run_workflow` to execute, or apply more modifications.",
-              ].join("\n"),
-            },
-          ],
+          content: [{ type: "text", text: lines.join("\n") }],
         };
       } catch (err) {
         return errorToToolResult(err);

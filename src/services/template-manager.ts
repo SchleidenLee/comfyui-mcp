@@ -245,11 +245,33 @@ export function getTemplateIds(): string[] {
 // ============================================================================
 
 /**
+ * 参数名到节点输入的映射定义
+ */
+interface ParamMapping {
+  inputName: string;
+  classType?: string;
+  metaTitleIncludes?: string;
+}
+
+const PARAM_MAPPINGS: Record<string, ParamMapping> = {
+  positive_prompt: { inputName: "text", classType: "CLIPTextEncode", metaTitleIncludes: "Positive" },
+  negative_prompt: { inputName: "text", classType: "CLIPTextEncode", metaTitleIncludes: "Negative" },
+  checkpoint: { inputName: "ckpt_name", classType: "CheckpointLoaderSimple" },
+  image_path: { inputName: "image", classType: "LoadImage" },
+  mask_path: { inputName: "image", classType: "LoadImage", metaTitleIncludes: "Mask" },
+  control_image: { inputName: "image", classType: "LoadImage", metaTitleIncludes: "Control" },
+  reference_image: { inputName: "image", classType: "LoadImage", metaTitleIncludes: "Reference" },
+  upscale_model: { inputName: "model_name", classType: "UpscaleModelLoader" },
+  controlnet_model: { inputName: "control_net_name", classType: "ControlNetLoader" },
+};
+
+/**
  * 将参数应用到工作流模板
  *
  * 策略：
  * 1. 精确匹配节点输入字段名
- * 2. 对于特殊字段（如 seed/steps/cfg 等），在所有节点中查找并替换
+ * 2. 参数名映射（如 positive_prompt → CLIPTextEncode.text）
+ * 3. 对于特殊字段（如 seed/steps/cfg 等），在所有节点中查找并替换
  */
 function applyParamsToWorkflow(
   workflow: Record<string, unknown>,
@@ -263,7 +285,29 @@ function applyParamsToWorkflow(
   for (const [paramName, paramValue] of Object.entries(params)) {
     if (paramValue === undefined || paramValue === null) continue;
 
-    for (const [nodeId, node] of Object.entries(result) as [string, Record<string, unknown>][]) {
+    // 先尝试参数名映射（如 positive_prompt → CLIPTextEncode.text）
+    const mapping = PARAM_MAPPINGS[paramName];
+    if (mapping) {
+      for (const node of Object.values(result) as Record<string, unknown>[]) {
+        const nodeClass = node.class_type as string | undefined;
+        const inputs = node.inputs as Record<string, unknown> | undefined;
+        if (!inputs || (mapping.classType && nodeClass !== mapping.classType)) continue;
+
+        // 如果指定了 metaTitleIncludes，检查 _meta.title
+        if (mapping.metaTitleIncludes) {
+          const meta = node._meta as Record<string, unknown> | undefined;
+          const title = (meta?.title as string) ?? "";
+          if (!title.includes(mapping.metaTitleIncludes)) continue;
+        }
+
+        if (inputs[mapping.inputName] !== undefined) {
+          inputs[mapping.inputName] = paramValue;
+        }
+      }
+      continue;
+    }
+
+    for (const node of Object.values(result) as Record<string, unknown>[]) {
       const inputs = node.inputs as Record<string, unknown> | undefined;
       if (!inputs) continue;
 

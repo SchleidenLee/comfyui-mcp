@@ -1,4 +1,5 @@
-import type { WorkflowJSON, WorkflowNode } from "../comfyui/types.js";
+import type { WorkflowJSON, WorkflowNode, ComfyUINodeDef, ObjectInfo } from "../comfyui/types.js";
+import { getObjectInfo } from "../comfyui/client.js";
 import { ValidationError } from "../utils/errors.js";
 
 // --- Helpers ---
@@ -495,11 +496,84 @@ function applySetInput(wf: WorkflowJSON, op: SetInputOp): void {
   node.inputs[op.input_name] = op.value;
 }
 
-function applyAddNode(wf: WorkflowJSON, op: AddNodeOp): string {
+// --- Type-aware connection helpers ---
+
+function typeMatches(inputType: string | string[], targetType: string): boolean {
+  if (Array.isArray(inputType)) {
+    return inputType.includes(targetType) || inputType.includes("*");
+  }
+  return inputType === targetType || inputType === "*";
+}
+
+function getNodeInputType(def: ComfyUINodeDef, inputName: string): string | string[] | null {
+  const required = def.input.required ?? {};
+  if (required[inputName]) {
+    return required[inputName][0];
+  }
+  const optional = def.input.optional ?? {};
+  if (optional[inputName]) {
+    return optional[inputName][0];
+  }
+  return null;
+}
+
+function findMatchingInput(
+  def: ComfyUINodeDef,
+  sourceOutputType: string,
+  existingInputs: Record<string, unknown>,
+): { inputName: string; fromRequired: boolean } | null {
+  const required = def.input.required ?? {};
+  for (const [name, spec] of Object.entries(required)) {
+    if (existingInputs[name] !== undefined) continue;
+    const inputType = spec[0];
+    if (typeof inputType === "string" || Array.isArray(inputType)) {
+      if (typeMatches(inputType, sourceOutputType)) {
+        return { inputName: name, fromRequired: true };
+      }
+    }
+  }
+
+  const optional = def.input.optional ?? {};
+  for (const [name, spec] of Object.entries(optional)) {
+    if (existingInputs[name] !== undefined) continue;
+    const inputType = spec[0];
+    if (typeof inputType === "string" || Array.isArray(inputType)) {
+      if (typeMatches(inputType, sourceOutputType)) {
+        return { inputName: name, fromRequired: false };
+      }
+    }
+  }
+
+  return null;
+}
+
+function findMatchingOutput(def: ComfyUINodeDef, targetInputType: string): number | null {
+  for (let i = 0; i < def.output.length; i++) {
+    if (def.output[i] === targetInputType || def.output[i] === "*") {
+      return i;
+    }
+  }
+  return null;
+}
+
+export interface ConnectionInfo {
+  node_id: string;
+  input_name: string;
+  source_id: string;
+  output_index: number;
+  matched_type: string;
+}
+
+async function applyAddNode(
+  wf: WorkflowJSON,
+  op: AddNodeOp,
+  objectInfo?: ObjectInfo,
+): Promise<{ id: string; connectionInfo?: ConnectionInfo[] }> {
   const id = op.id ?? getNextNodeId(wf);
   if (wf[id]) throw new ValidationError(`Node ID "${id}" already exists`);
 
   const newInputs: Record<string, unknown> = { ...(op.inputs ?? {}) };
+  const connectionInfo: ConnectionInfo[] = [];
 
   // If insert_between is specified, wire the new node between source and target
   if (op.insert_between) {
@@ -507,27 +581,86 @@ function applyAddNode(wf: WorkflowJSON, op: AddNodeOp): string {
     if (!wf[source_id]) throw new ValidationError(`Source node "${source_id}" not found`);
     if (!wf[target_id]) throw new ValidationError(`Target node "${target_id}" not found`);
 
-    // Connect the new node's primary input to the original source
-    const primaryInputNames = ["model", "clip", "samples", "latent_image", "image", "conditioning", "pixels"];
-    let connected = false;
-    for (const name of primaryInputNames) {
-      if (!(name in newInputs)) {
-        newInputs[name] = [source_id, output_index];
-        connected = true;
-        break;
+    const sourceClass = wf[source_id].class_type;
+    const targetClass = wf[target_id].class_type;
+    const newClass = op.class_type;
+
+    if (objectInfo) {
+      const sourceDef = objectInfo[sourceClass];
+      const targetDef = objectInfo[targetClass];
+      const newDef = objectInfo[newClass];
+
+      // Determine source output type
+      const sourceOutputType = sourceDef?.output[output_index] ?? null;
+
+      // Find best input on new node matching source output type
+      if (sourceOutputType && newDef) {
+        const match = findMatchingInput(newDef, sourceOutputType, newInputs);
+        if (match) {
+          newInputs[match.inputName] = [source_id, output_index];
+          connectionInfo.push({
+            node_id: id,
+            input_name: match.inputName,
+            source_id,
+            output_index,
+            matched_type: sourceOutputType,
+          });
+        } else {
+          // Fallback: try common names if type match fails
+          const fallbackNames = ["model", "clip", "samples", "latent_image", "image", "conditioning", "pixels"];
+          for (const name of fallbackNames) {
+            if (!(name in newInputs) && newDef.input.required?.[name] !== undefined) {
+              newInputs[name] = [source_id, output_index];
+              connectionInfo.push({
+                node_id: id,
+                input_name: name,
+                source_id,
+                output_index,
+                matched_type: sourceOutputType,
+              });
+              break;
+            }
+          }
+        }
       }
-    }
-    if (!connected) {
-      newInputs["input"] = [source_id, output_index];
+
+      // Determine target input type and find matching output on new node
+      let targetOutputIndex = 0;
+      if (targetDef) {
+        const targetInputType = getNodeInputType(targetDef, input_name);
+        if (targetInputType && newDef) {
+          const outMatch = findMatchingOutput(newDef, typeof targetInputType === "string" ? targetInputType : targetInputType[0]);
+          if (outMatch !== null) {
+            targetOutputIndex = outMatch;
+          }
+        }
+      }
+
+      wf[target_id].inputs[input_name] = [id, targetOutputIndex];
+      if (connectionInfo.length > 0) {
+        connectionInfo[connectionInfo.length - 1].output_index = targetOutputIndex;
+      }
+    } else {
+      // No object_info available: use legacy hardcoded fallback
+      const fallbackNames = ["model", "clip", "samples", "latent_image", "image", "conditioning", "pixels"];
+      let connected = false;
+      for (const name of fallbackNames) {
+        if (!(name in newInputs)) {
+          newInputs[name] = [source_id, output_index];
+          connected = true;
+          break;
+        }
+      }
+      if (!connected) {
+        newInputs["input"] = [source_id, output_index];
+      }
+      wf[target_id].inputs[input_name] = [id, 0];
     }
 
     wf[id] = {
       class_type: op.class_type,
       inputs: newInputs,
     };
-
-    // Rewire: target's input now points to the new node's output 0
-    wf[target_id].inputs[input_name] = [id, 0];
   } else {
     wf[id] = {
       class_type: op.class_type,
@@ -535,7 +668,7 @@ function applyAddNode(wf: WorkflowJSON, op: AddNodeOp): string {
     };
   }
 
-  return id;
+  return { id, connectionInfo: connectionInfo.length > 0 ? connectionInfo : undefined };
 }
 
 function applyRemoveNode(wf: WorkflowJSON, op: RemoveNodeOp): void {
@@ -563,13 +696,33 @@ function applyConnect(wf: WorkflowJSON, op: ConnectOp): void {
   wf[op.target_id].inputs[op.input_name] = [op.source_id, op.output_index];
 }
 
-export function modifyWorkflow(
+export interface ModifyResult {
+  workflow: WorkflowJSON;
+  added_ids: string[];
+  connection_info?: ConnectionInfo[];
+}
+
+export async function modifyWorkflow(
   workflow: WorkflowJSON,
   operations: ModifyOperation[],
-): { workflow: WorkflowJSON; added_ids: string[] } {
+): Promise<ModifyResult> {
   // Deep clone to avoid mutating the original
   const wf: WorkflowJSON = JSON.parse(JSON.stringify(workflow));
   const addedIds: string[] = [];
+  const allConnectionInfo: ConnectionInfo[] = [];
+
+  // Pre-load object_info if any insert_between operations exist
+  const needsObjectInfo = operations.some(
+    (op) => op.op === "add_node" && op.insert_between,
+  );
+  let objectInfo: ObjectInfo | undefined;
+  if (needsObjectInfo) {
+    try {
+      objectInfo = await getObjectInfo();
+    } catch {
+      // Fall back to legacy hardcoded logic if object_info unavailable
+    }
+  }
 
   for (const op of operations) {
     switch (op.op) {
@@ -577,8 +730,11 @@ export function modifyWorkflow(
         applySetInput(wf, op);
         break;
       case "add_node": {
-        const id = applyAddNode(wf, op);
-        addedIds.push(id);
+        const result = await applyAddNode(wf, op, objectInfo);
+        addedIds.push(result.id);
+        if (result.connectionInfo) {
+          allConnectionInfo.push(...result.connectionInfo);
+        }
         break;
       }
       case "remove_node":
@@ -592,5 +748,9 @@ export function modifyWorkflow(
     }
   }
 
-  return { workflow: wf, added_ids: addedIds };
+  return {
+    workflow: wf,
+    added_ids: addedIds,
+    connection_info: allConnectionInfo.length > 0 ? allConnectionInfo : undefined,
+  };
 }
