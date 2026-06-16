@@ -30,16 +30,6 @@ export const MODEL_SUBDIRS = [
 
 export type ModelType = (typeof MODEL_SUBDIRS)[number];
 
-export interface HFModelResult {
-  id: string;
-  modelId: string;
-  author: string;
-  tags: string[];
-  downloads: number;
-  likes: number;
-  lastModified: string;
-}
-
 export interface LocalModel {
   name: string;
   path: string;
@@ -53,47 +43,6 @@ function getModelsRoot(): string {
     throw new ModelError("COMFYUI_PATH is not configured. Set the COMFYUI_PATH environment variable.");
   }
   return join(config.comfyuiPath, "models");
-}
-
-export async function searchHuggingFaceModels(
-  query: string,
-  options: { filter?: string; limit?: number } = {},
-): Promise<HFModelResult[]> {
-  const { filter, limit = 10 } = options;
-  const params = new URLSearchParams({
-    search: query,
-    limit: String(limit),
-  });
-  if (filter) params.set("filter", filter);
-
-  const headers: Record<string, string> = {};
-  if (config.huggingfaceToken) {
-    headers["Authorization"] = `Bearer ${config.huggingfaceToken}`;
-  }
-
-  const url = `https://huggingface.co/api/models?${params}`;
-  logger.debug("HuggingFace API request", { url });
-
-  const res = await fetch(url, { headers });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new ModelError(
-      `HuggingFace API ${res.status}: ${res.statusText}`,
-      { url, status: res.status, body },
-    );
-  }
-
-  const data = (await res.json()) as Array<Record<string, unknown>>;
-
-  return data.map((m) => ({
-    id: String(m.id ?? m._id ?? ""),
-    modelId: String(m.modelId ?? m.id ?? ""),
-    author: String(m.author ?? ""),
-    tags: Array.isArray(m.tags) ? m.tags.map(String) : [],
-    downloads: Number(m.downloads ?? 0),
-    likes: Number(m.likes ?? 0),
-    lastModified: String(m.lastModified ?? ""),
-  }));
 }
 
 export async function listLocalModels(

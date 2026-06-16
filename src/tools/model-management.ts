@@ -1,88 +1,56 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  searchHuggingFaceModels,
   listLocalModels,
   downloadModel,
   MODEL_SUBDIRS,
 } from "../services/model-resolver.js";
 import { errorToToolResult } from "../utils/errors.js";
+import type { DownloadAuth } from "../services/download-auth.js";
 
 const modelTypeEnum = z.enum(MODEL_SUBDIRS);
 
-const downloadAuthSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("bearer"),
-    token: z.string().min(1).describe("Bearer token value"),
-  }),
-  z.object({
-    type: z.literal("basic"),
-    username: z.string().describe("Basic auth username"),
-    password: z.string().describe("Basic auth password"),
-  }),
-  z.object({
-    type: z.literal("header"),
-    header_name: z.string().min(1).describe("HTTP header name"),
-    header_value: z.string().describe("HTTP header value"),
-  }),
-  z.object({
-    type: z.literal("query"),
-    query_param: z.string().min(1).describe("Query parameter name"),
-    query_value: z.string().describe("Query parameter value"),
-  }),
-  z.object({
-    type: z.literal("s3"),
-    access_key_id: z.string().min(1).describe("AWS/S3-compatible access key id"),
-    secret_access_key: z.string().min(1).describe("AWS/S3-compatible secret access key"),
-    session_token: z.string().optional().describe("Optional temporary session token"),
-    region: z.string().optional().describe("Optional AWS region override"),
-    endpoint: z.string().url().optional().describe("Optional S3-compatible endpoint for R2-style storage"),
-  }),
-]);
+const downloadAuthSchema = z.object({
+  type: z.string().describe("Auth type: bearer, basic, header, query, or s3"),
+  token: z.string().optional().describe("Bearer token value (for bearer)"),
+  username: z.string().optional().describe("Basic auth username (for basic)"),
+  password: z.string().optional().describe("Basic auth password (for basic)"),
+  header_name: z.string().optional().describe("HTTP header name (for header)"),
+  header_value: z.string().optional().describe("HTTP header value (for header)"),
+  query_param: z.string().optional().describe("Query parameter name (for query)"),
+  query_value: z.string().optional().describe("Query parameter value (for query)"),
+  access_key_id: z.string().optional().describe("AWS/S3 access key id (for s3)"),
+  secret_access_key: z.string().optional().describe("AWS/S3 secret access key (for s3)"),
+  session_token: z.string().optional().describe("Optional S3 session token (for s3)"),
+  region: z.string().optional().describe("Optional AWS region (for s3)"),
+  endpoint: z.string().url().optional().describe("Optional S3 endpoint (for s3)"),
+}).optional();
+
+function convertToDownloadAuth(input: NonNullable<typeof downloadAuthSchema._output>): DownloadAuth {
+  switch (input.type) {
+    case "bearer":
+      return { type: "bearer", token: input.token! };
+    case "basic":
+      return { type: "basic", username: input.username!, password: input.password! };
+    case "header":
+      return { type: "header", header_name: input.header_name!, header_value: input.header_value! };
+    case "query":
+      return { type: "query", query_param: input.query_param!, query_value: input.query_value! };
+    case "s3":
+      return {
+        type: "s3",
+        access_key_id: input.access_key_id!,
+        secret_access_key: input.secret_access_key!,
+        session_token: input.session_token,
+        region: input.region,
+        endpoint: input.endpoint,
+      };
+    default:
+      throw new Error(`Unknown auth type: ${input.type}`);
+  }
+}
 
 export function registerModelManagementTools(server: McpServer): void {
-  server.tool(
-    "search_models",
-    "Search HuggingFace Hub for models usable in ComfyUI (checkpoints, LoRAs, VAEs, ControlNets, etc.). Read-only and network-only: queries HuggingFace over HTTP, does NOT require a running ComfyUI or COMFYUI_PATH and does not download anything. Returns a ranked list with modelId, author, downloads, likes, and tags. Pick a result's download URL and pass it to download_model to install it locally. For packs of custom nodes (not models) use search_custom_nodes.",
-    {
-      query: z.string().describe("Search query (e.g. 'SDXL', 'flux', 'controlnet')"),
-      filter: z
-        .string()
-        .optional()
-        .describe("Optional HuggingFace pipeline/library tag to narrow results, e.g. 'diffusers' or 'text-to-image'"),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(50)
-        .optional()
-        .describe("Max results to return (default 10)"),
-    },
-    async (args) => {
-      try {
-        const results = await searchHuggingFaceModels(args.query, {
-          filter: args.filter,
-          limit: args.limit,
-        });
-
-        const text = results.length === 0
-          ? `No models found for "${args.query}".`
-          : results
-              .map(
-                (m, i) =>
-                  `${i + 1}. **${m.modelId}** by ${m.author || "unknown"}\n` +
-                  `   Downloads: ${m.downloads.toLocaleString()} | Likes: ${m.likes}\n` +
-                  `   Tags: ${m.tags.slice(0, 5).join(", ") || "none"}`,
-              )
-              .join("\n\n");
-
-        return { content: [{ type: "text", text }] };
-      } catch (err) {
-        return errorToToolResult(err);
-      }
-    },
-  );
-
   server.tool(
     "download_model",
     "Download a model file to the ComfyUI models directory from a URL (HuggingFace, direct HTTP(S), s3://, or Azure Blob)",
@@ -96,19 +64,22 @@ export function registerModelManagementTools(server: McpServer): void {
         .optional()
         .describe("Override filename (auto-detected from URL if omitted)"),
       auth: downloadAuthSchema
-        .optional()
         .describe(
           "Optional per-request authentication for private/gated model URLs. " +
-            "When provided it overrides built-in HuggingFace/CivitAI token handling.",
+            "When provided it overrides built-in HuggingFace/CivitAI token handling. " +
+            "Specify `type` as one of: bearer (with `token`), basic (with `username`/`password`), " +
+            "header (with `header_name`/`header_value`), query (with `query_param`/`query_value`), " +
+            "or s3 (with `access_key_id`/`secret_access_key`, optionally `session_token`/`region`/`endpoint`).",
         ),
     },
     async (args) => {
       try {
+        const auth = args.auth ? convertToDownloadAuth(args.auth) : undefined;
         const savedPath = await downloadModel(
           args.url,
           args.target_subfolder,
           args.filename,
-          args.auth,
+          auth,
         );
 
         return {
@@ -127,7 +98,7 @@ export function registerModelManagementTools(server: McpServer): void {
 
   server.tool(
     "list_local_models",
-    "List model files installed in the local ComfyUI models/ directory (filesystem scan), grouped by type with size and modified time. Read-only; requires COMFYUI_PATH (local installs only) and does NOT contact ComfyUI or the network. Use to see which models are already available locally before generating or downloading; use search_models to discover new models on HuggingFace, then download_model to fetch them.",
+    "List model files installed in the local ComfyUI models/ directory (filesystem scan), grouped by type with size and modified time. Read-only; requires COMFYUI_PATH (local installs only) and does NOT contact ComfyUI or the network.",
     {
       model_type: modelTypeEnum
         .optional()

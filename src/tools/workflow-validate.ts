@@ -30,10 +30,7 @@ export function registerWorkflowValidateTools(server: McpServer): void {
     "Validate a ComfyUI workflow without executing it. Checks for missing node types, broken connections, invalid output indices, missing models, and other issues. Returns errors with fix suggestions and auto_fix operations. Accepts either a session_id or a raw workflow JSON.",
     {
       session_id: z.string().optional().describe("Session ID to validate (from select_template or load_workflow)"),
-      workflow: z
-        .union([z.string(), z.record(z.any())])
-        .optional()
-        .describe("ComfyUI workflow in API format (JSON string or object). Use session_id instead if you have one."),
+      workflow: z.string().optional().describe("ComfyUI workflow in API format as JSON string. Use session_id instead if you have one."),
     },
     async ({ session_id, workflow }) => {
       try {

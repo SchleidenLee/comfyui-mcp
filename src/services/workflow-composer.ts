@@ -1,6 +1,7 @@
 import type { WorkflowJSON, WorkflowNode, ComfyUINodeDef, ObjectInfo } from "../comfyui/types.js";
 import { getObjectInfo } from "../comfyui/client.js";
 import { ValidationError } from "../utils/errors.js";
+import { logger } from "../utils/logger.js";
 
 // --- Helpers ---
 
@@ -458,6 +459,12 @@ interface SetInputOp {
   value: unknown;
 }
 
+interface SetParamOp {
+  op: "set_param";
+  param_name: string;
+  value: unknown;
+}
+
 interface AddNodeOp {
   op: "add_node";
   class_type: string;
@@ -484,16 +491,104 @@ interface ConnectOp {
   input_name: string;
 }
 
+interface DisconnectOp {
+  op: "disconnect";
+  target_id: string;
+  input_name: string;
+}
+
 export type ModifyOperation =
   | SetInputOp
+  | SetParamOp
   | AddNodeOp
   | RemoveNodeOp
-  | ConnectOp;
+  | ConnectOp
+  | DisconnectOp;
 
-function applySetInput(wf: WorkflowJSON, op: SetInputOp): void {
+function applySetInput(wf: WorkflowJSON, op: SetInputOp, objectInfo?: ObjectInfo): void {
   const node = wf[op.node_id];
   if (!node) throw new ValidationError(`Node "${op.node_id}" not found`);
+
+  // If we have object_info, validate the input exists on this node type
+  if (objectInfo) {
+    const def = objectInfo[node.class_type];
+    if (def) {
+      const required = def.input.required ?? {};
+      const optional = def.input.optional ?? {};
+      if (!(op.input_name in required) && !(op.input_name in optional)) {
+        const knownInputs = [...Object.keys(required), ...Object.keys(optional)];
+        throw new ValidationError(
+          `Node "${op.node_id}" (${node.class_type}) has no input "${op.input_name}". Known inputs: ${knownInputs.join(", ")}`,
+        );
+      }
+    }
+  }
+
   node.inputs[op.input_name] = op.value;
+}
+
+// --- Parameter mapping for set_param ---
+
+interface ParamMapping {
+  inputName: string;
+  classType?: string;
+  metaTitleIncludes?: string;
+}
+
+const PARAM_MAPPINGS: Record<string, ParamMapping> = {
+  positive_prompt: { inputName: "text", classType: "CLIPTextEncode", metaTitleIncludes: "Positive" },
+  negative_prompt: { inputName: "text", classType: "CLIPTextEncode", metaTitleIncludes: "Negative" },
+  checkpoint: { inputName: "ckpt_name", classType: "CheckpointLoaderSimple" },
+  image_path: { inputName: "image", classType: "LoadImage" },
+  mask_path: { inputName: "image", classType: "LoadImage", metaTitleIncludes: "Mask" },
+  control_image: { inputName: "image", classType: "LoadImage", metaTitleIncludes: "Control" },
+  reference_image: { inputName: "image", classType: "LoadImage", metaTitleIncludes: "Reference" },
+  upscale_model: { inputName: "model_name", classType: "UpscaleModelLoader" },
+  controlnet_model: { inputName: "control_net_name", classType: "ControlNetLoader" },
+};
+
+const GLOBAL_PARAMS = new Set(["seed", "steps", "cfg", "denoise", "sampler_name", "scheduler"]);
+
+function applySetParam(wf: WorkflowJSON, op: SetParamOp): string[] {
+  const mapping = PARAM_MAPPINGS[op.param_name];
+  const applied: string[] = [];
+
+  if (mapping) {
+    for (const [nodeId, node] of Object.entries(wf)) {
+      const nodeClass = node.class_type as string | undefined;
+      const inputs = node.inputs as Record<string, unknown> | undefined;
+      if (!inputs || (mapping.classType && nodeClass !== mapping.classType)) continue;
+
+      if (mapping.metaTitleIncludes) {
+        const meta = node._meta as Record<string, unknown> | undefined;
+        const title = (meta?.title as string) ?? "";
+        if (!title.includes(mapping.metaTitleIncludes)) continue;
+      }
+
+      if (inputs[mapping.inputName] !== undefined) {
+        inputs[mapping.inputName] = op.value;
+        applied.push(`Node ${nodeId} (${nodeClass}).${mapping.inputName}`);
+      }
+    }
+  } else if (GLOBAL_PARAMS.has(op.param_name)) {
+    for (const [nodeId, node] of Object.entries(wf)) {
+      const inputs = node.inputs as Record<string, unknown> | undefined;
+      if (!inputs) continue;
+      const existing = inputs[op.param_name];
+      if (existing !== undefined && typeof existing === "number") {
+        inputs[op.param_name] = op.value;
+        applied.push(`Node ${nodeId} (${node.class_type}).${op.param_name}`);
+      }
+    }
+  } else {
+    throw new ValidationError(`Unknown parameter "${op.param_name}". Known: ${Object.keys(PARAM_MAPPINGS).join(", ")}, ${[...GLOBAL_PARAMS].join(", ")}`);
+  }
+
+  if (applied.length === 0) {
+    throw new ValidationError(`No matching input found for parameter "${op.param_name}"`);
+  }
+
+  return applied;
 }
 
 // --- Type-aware connection helpers ---
@@ -696,6 +791,15 @@ function applyConnect(wf: WorkflowJSON, op: ConnectOp): void {
   wf[op.target_id].inputs[op.input_name] = [op.source_id, op.output_index];
 }
 
+function applyDisconnect(wf: WorkflowJSON, op: DisconnectOp): void {
+  const node = wf[op.target_id];
+  if (!node) throw new ValidationError(`Node "${op.target_id}" not found`);
+  if (node.inputs[op.input_name] === undefined) {
+    throw new ValidationError(`Node "${op.target_id}" has no input "${op.input_name}"`);
+  }
+  delete node.inputs[op.input_name];
+}
+
 export interface ModifyResult {
   workflow: WorkflowJSON;
   added_ids: string[];
@@ -711,9 +815,9 @@ export async function modifyWorkflow(
   const addedIds: string[] = [];
   const allConnectionInfo: ConnectionInfo[] = [];
 
-  // Pre-load object_info if any insert_between operations exist
+  // Pre-load object_info if any insert_between operations exist or if there are set_input operations
   const needsObjectInfo = operations.some(
-    (op) => op.op === "add_node" && op.insert_between,
+    (op) => (op.op === "add_node" && (op as AddNodeOp).insert_between) || op.op === "set_input",
   );
   let objectInfo: ObjectInfo | undefined;
   if (needsObjectInfo) {
@@ -727,8 +831,13 @@ export async function modifyWorkflow(
   for (const op of operations) {
     switch (op.op) {
       case "set_input":
-        applySetInput(wf, op);
+        applySetInput(wf, op, objectInfo);
         break;
+      case "set_param": {
+        const applied = applySetParam(wf, op);
+        logger.info("set_param applies to:", applied);
+        break;
+      }
       case "add_node": {
         const result = await applyAddNode(wf, op, objectInfo);
         addedIds.push(result.id);
@@ -742,6 +851,9 @@ export async function modifyWorkflow(
         break;
       case "connect":
         applyConnect(wf, op);
+        break;
+      case "disconnect":
+        applyDisconnect(wf, op);
         break;
       default:
         throw new ValidationError(`Unknown operation: ${(op as { op: string }).op}`);

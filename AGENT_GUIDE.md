@@ -1,6 +1,6 @@
 # ComfyUI MCP Agent 完整使用指南
 
-> **版本**: v3.0 | **最后更新**: 2026-06-13 | **工具总数**: 80+
+> **版本**: v3.1 | **最后更新**: 2026-06-16 | **工具总数**: 79+
 
 ---
 
@@ -178,11 +178,10 @@ select  modify  run   save   close
 |------|------|------|------|
 | [`get_node_info`](#38-get_node_info) | `node_type?` | 节点定义 | 查询节点输入输出 schema |
 
-### 八、模型管理（5 个）
+### 八、模型管理（4 个）
 
 | 工具 | 参数 | 返回 | 用途 |
 |------|------|------|------|
-| [`search_models`](#39-search_models) | `query`, `filter?`, `limit?` | 模型列表 | 搜索 HuggingFace 模型 |
 | [`download_model`](#40-download_model) | `url`, `target_subfolder`, `filename?`, `auth?` | 保存路径 | 下载模型到本地 |
 | [`download_civitai_model`](#41-download_civitai_model) | `target_subfolder`, `model_id?`, `model_version_id?`, `filename?` | 保存路径 | 从 CivitAI 下载模型 |
 | [`list_local_models`](#42-list_local_models) | `model_type?` | 本地模型列表 | 列出已安装的模型 |
@@ -524,7 +523,7 @@ fork_session("sess_abc123", "v2尝试")
 
 ### 9. modify_workflow
 
-修改 Session 对应的工作流。支持 5 种操作。
+修改 Session 对应的工作流。支持 6 种操作。
 
 **参数**:
 - `session_id` (必需)
@@ -533,10 +532,12 @@ fork_session("sess_abc123", "v2尝试")
 **操作类型**:
 | op | 参数 | 说明 |
 |----|------|------|
-| `set_input` | `node_id`, `input_name`, `value` | 修改节点参数 |
+| `set_param` | `param_name`, `value` | 用模板参数名修改（推荐），如 `checkpoint`、`positive_prompt`、`seed` |
+| `set_input` | `node_id`, `input_name`, `value` | 直接修改节点输入口（需知道节点 ID 和输入口名称） |
 | `add_node` | `class_type`, `inputs?`, `id?`, `insert_between?` | 添加新节点（支持智能插入） |
 | `remove_node` | `node_id` | 删除节点 |
 | `connect` | `source_id`, `output_index`, `target_id`, `input_name` | 建立连接 |
+| `disconnect` | `disconnect_target_id`, `disconnect_input_name` | 断开指定节点的某个输入连线（保留节点） |
 
 **返回**:
 ```json
@@ -898,17 +899,6 @@ DSL 转工作流 JSON。
 
 ---
 
-### 39. search_models
-
-搜索 HuggingFace 模型。
-
-**参数**:
-- `query` (必需)
-- `filter` (可选): 如 `diffusers`
-- `limit` (可选): 默认 10
-
----
-
 ### 40. download_model
 
 下载模型到本地。
@@ -1260,10 +1250,15 @@ ControlNet 条件生成。
 
 **参数**:
 - `prompt` (必需)
-- `control_image` (必需): 已上传的控制图文件名
+- `control_image` (必需): 控制图文件名（ComfyUI `input/` 目录下的相对路径，如 `"pose_reference.png"` 或 `"controlnet/depth_map.png"`）。先用 `list_input_images` 查看可用图片。
 - `controlnet_model` (可选): 自动选择
 - `strength` (可选): 控制强度
 - 通用参数: `width` / `height` / `steps` / `cfg` / `sampler` / `scheduler` / `seed` / `checkpoint`
+
+**使用流程**:
+1. 提前把参考图放入 ComfyUI 的 `input/` 目录（可带子文件夹）
+2. `list_input_images` → 选一张（如 `"controlnet/pose.png"`）
+3. `generate_with_controlnet` → 设置 `control_image: "controlnet/pose.png"`
 
 ---
 
@@ -1370,17 +1365,20 @@ IP-Adapter 参考图生成。
      width: 1024, height: 1024
    })
    → session_id: "sess_abc123"
-3. modify_workflow("sess_abc123", [    // 添加 LoRA（智能插入，自动连线）
+3. modify_workflow("sess_abc123", [    // 修改参数（用 set_param，更简单）
+     { op: "set_param", param_name: "checkpoint", value: "PonyDiffusionV6XL.safetensors" }
+   ])
+4. modify_workflow("sess_abc123", [    // 添加 LoRA（智能插入，自动连线）
      { op: "add_node", class_type: "LoraLoader",
        inputs: { lora_name: "add-detail-xl.safetensors", strength_model: 0.8, strength_clip: 0.8 },
        insert_between: { source_id: "1", output_index: 0, target_id: "4", input_name: "model" } }
    ])
-4. validate_workflow("sess_abc123")    // 验证
-5. run_workflow("sess_abc123")         // 运行
+5. validate_workflow("sess_abc123")    // 验证
+6. run_workflow("sess_abc123")         // 运行
    → prompt_id: "prompt_xyz789"
-6. get_job_status("prompt_xyz789")     // 监控
-7. save_session_as_workflow("sess_abc123", "我的Lora工作流_v1")  // 保存
-8. close_session("sess_abc123")        // 清理
+7. get_job_status("prompt_xyz789")     // 监控
+8. save_session("sess_abc123", "我的Lora工作流_v1", { save_as: "workflow" })  // 保存
+9. close_session("sess_abc123")        // 清理
 ```
 
 ### 场景 2：加载已有工作流继续编辑
@@ -1426,7 +1424,28 @@ generate_image({
 
 ## modify_workflow 操作详解
 
-### 1. set_input — 修改节点参数
+### 1. set_param — 用模板参数名修改（推荐）
+
+```json
+{
+  "op": "set_param",
+  "param_name": "checkpoint",
+  "value": "PonyDiffusionV6XL.safetensors"
+}
+```
+
+**支持的参数**:
+| param_name | 映射到的节点输入 |
+|-----------|-----------------|
+| `checkpoint` | `CheckpointLoaderSimple.ckpt_name` |
+| `positive_prompt` | `CLIPTextEncode.text`（title 含 "Positive"） |
+| `negative_prompt` | `CLIPTextEncode.text`（title 含 "Negative"） |
+| `image_path` | `LoadImage.image` |
+| `controlnet_model` | `ControlNetLoader.control_net_name` |
+| `upscale_model` | `UpscaleModelLoader.model_name` |
+| `seed` / `steps` / `cfg` / `denoise` / `sampler_name` / `scheduler` | 所有匹配该输入名的数值型参数 |
+
+### 2. set_input — 直接修改节点输入口
 
 ```json
 {
@@ -1437,7 +1456,9 @@ generate_image({
 }
 ```
 
-### 2. add_node — 添加新节点
+注意：需要知道正确的节点 ID 和输入口名称。如果节点没有该输入口会报错。推荐使用 `set_param` 代替。
+
+### 3. add_node — 添加新节点
 
 ```json
 {
@@ -1454,13 +1475,13 @@ generate_image({
 ```
 返回新节点的 `node_id`。
 
-### 3. remove_node — 删除节点
+### 4. remove_node — 删除节点
 
 ```json
 {"op": "remove_node", "node_id": "8"}
 ```
 
-### 4. connect — 建立连接
+### 5. connect — 建立连接
 
 ```json
 {
@@ -1473,24 +1494,16 @@ generate_image({
 ```
 含义：节点 1 的输出 0 → 节点 5 的 model 输入。
 
-### 5. insert_between — 在两个节点之间插入
+### 6. disconnect — 断开指定输入连线
 
 ```json
 {
-  "op": "insert_between",
-  "source_id": "1",
-  "output_index": 0,
-  "target_id": "5",
-  "input_name": "model",
-  "new_class_type": "LoraLoader",
-  "new_inputs": {
-    "lora_name": "xxx.safetensors",
-    "strength_model": 0.8,
-    "strength_clip": 0.8
-  }
+  "op": "disconnect",
+  "disconnect_target_id": "5",
+  "disconnect_input_name": "model"
 }
 ```
-自动：断开 1→5，插入新节点，连线 1→新→5。
+含义：断开节点 5 的 model 输入连线（保留节点本身，不拔掉所有线）。
 
 ---
 
@@ -1553,6 +1566,26 @@ diff_sessions("sess_abc", "sess_def")
 
 名字完全一致的参数（如 `width`, `height`, `seed`, `steps`, `cfg`）会直接精确匹配。
 
+### Q: 修改基底模型/提示词时，用 set_param 还是 set_input？
+**推荐用 `set_param`**。它用模板参数名（如 `checkpoint`），MCP 内部会自动映射到正确的节点。
+用 `set_input` 需要知道节点 ID 和 ComfyUI 内部输入口名（如 `ckpt_name`），容易设错地方。
+
+```json
+// ✅ 正确：用 set_param
+{ "op": "set_param", "param_name": "checkpoint", "value": "PonyDiffusionV6XL.safetensors" }
+
+// ❌ 错误：用 set_input 容易设错节点
+{ "op": "set_input", "node_id": "3", "input_name": "ckpt_name", "value": "..." }
+// 节点 3 是 CLIPTextEncode，根本没有 ckpt_name 输入口！
+```
+
+### Q: 只想断开一根连线，不想删除节点怎么办？
+用 `disconnect` 操作。它会拔掉指定节点的某根输入线，但保留节点本身：
+
+```json
+{ "op": "disconnect", "disconnect_target_id": "5", "disconnect_input_name": "model" }
+```
+
 ### Q: 如何从网上下载的工作流 JSON 导入？
 ```
 import_workflow_from_json(json_string, "下载的LoRA工作流", "session")
@@ -1581,3 +1614,5 @@ get_session_history("sess_xxx")
 10. **分支实验**: 用 `fork_session()` 创建新分支尝试不同参数，不影响原工作流
 11. **对比差异**: 用 `diff_sessions()` 对比不同版本，确认改了什么
 12. **导入外部工作流**: 用 `import_workflow_from_json()` 导入网上下载的工作流，自动识别 UI/API 格式
+13. **优先用 set_param**: 修改参数时用 `set_param` 而不是 `set_input`，避免设错节点
+14. **用 disconnect 精准断线**: 只需断开某根线时用 `disconnect`，不要用 `remove_node`

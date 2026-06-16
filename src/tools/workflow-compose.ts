@@ -13,47 +13,41 @@ import { errorToToolResult, ValidationError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
 // ============================================================================
-// 操作 Schema
+// 操作 Schema - 使用 z.any() 避免 discriminatedUnion 导致的 Agent 序列化问题
+// MCP SDK 将复杂 Zod schema 转为 JSON Schema 后，LLM 在生成嵌套数组时
+// 容易错误地将 array 序列化为 string，导致 -32602 校验失败。
+// 改为宽松 schema + handler 内手动校验。
 // ============================================================================
 
-const operationSchema = z.discriminatedUnion("op", [
-  z.object({
-    op: z.literal("set_input"),
-    node_id: z.string(),
-    input_name: z.string(),
-    value: z.any(),
-  }),
-  z.object({
-    op: z.literal("add_node"),
-    class_type: z.string(),
-    inputs: z.record(z.any()).optional(),
-    id: z.string().optional(),
-    insert_between: z
-      .object({
-        source_id: z.string(),
-        output_index: z.number(),
-        target_id: z.string(),
-        input_name: z.string(),
-      })
-      .optional()
-      .describe(
-        "If provided, inserts the new node between source and target: " +
-          "breaks the existing connection, wires the new node's primary input to source, " +
-          "and rewires target's input to the new node's output 0.",
-      ),
-  }),
-  z.object({
-    op: z.literal("remove_node"),
-    node_id: z.string(),
-  }),
-  z.object({
-    op: z.literal("connect"),
-    source_id: z.string(),
-    output_index: z.number(),
-    target_id: z.string(),
-    input_name: z.string(),
-  }),
-]);
+const operationSchema = z.object({
+  op: z.string().describe("Operation type: set_param, set_input, add_node, remove_node, connect, or disconnect"),
+  node_id: z.string().optional().describe("Target node ID (for set_input, remove_node)"),
+  input_name: z.string().optional().describe("Input port name (for set_input, connect)"),
+  value: z.any().optional().describe("Value to set (for set_input, set_param)"),
+  param_name: z.string().optional().describe("Template parameter name (for set_param), e.g. checkpoint, positive_prompt, seed"),
+  class_type: z.string().optional().describe("Node class type (for add_node)"),
+  inputs: z.record(z.any()).optional().describe("Node input values (for add_node)"),
+  id: z.string().optional().describe("Explicit node ID (for add_node)"),
+  source_id: z.string().optional().describe("Source node ID (for connect, insert_between)"),
+  output_index: z.number().optional().describe("Source output index (for connect, insert_between)"),
+  target_id: z.string().optional().describe("Target node ID (for connect, insert_between)"),
+  insert_between: z
+    .object({
+      source_id: z.string(),
+      output_index: z.number(),
+      target_id: z.string(),
+      input_name: z.string(),
+    })
+    .optional()
+    .describe(
+      "If provided with add_node, inserts the new node between source and target: " +
+        "breaks the existing connection, wires the new node's primary input to source, " +
+        "and rewires target's input to the new node's output 0.",
+    ),
+  // For disconnect operation
+  disconnect_target_id: z.string().optional().describe("Target node ID to disconnect (for disconnect)"),
+  disconnect_input_name: z.string().optional().describe("Input port name to disconnect (for disconnect)"),
+});
 
 // ============================================================================
 // 工具注册
@@ -120,13 +114,13 @@ export function registerWorkflowComposeTools(server: McpServer): void {
   // ==========================================================================
   server.tool(
     "modify_workflow",
-    "Apply modification operations to a session's workflow. Supports: set_input, add_node (with optional insert_between), remove_node, connect. Operates on the session identified by session_id, not on raw JSON.",
+    "Apply modification operations to a session's workflow. Supports: set_param (by template parameter name), set_input (by node input), add_node (with optional insert_between), remove_node, connect. Operates on the session identified by session_id, not on raw JSON.",
     {
       session_id: z.string().describe("Session ID (from select_template or create_workflow)"),
       operations: z
         .array(operationSchema)
         .describe(
-          "Array of operations to apply in order. Each has an 'op' field: set_input, add_node, remove_node, or connect. Use add_node with insert_between to insert a node between two existing nodes.",
+          "Array of operations to apply in order. Each has an 'op' field: set_param, set_input, add_node, remove_node, connect, or disconnect. Use set_param to modify template parameters by name (e.g. checkpoint, positive_prompt, seed). Use add_node with insert_between to insert a node between two existing nodes.",
         ),
     },
     async ({ session_id, operations }) => {
@@ -146,13 +140,67 @@ export function registerWorkflowComposeTools(server: McpServer): void {
           };
         }
 
+        // 将扁平化 schema 操作转为内部 ModifyOperation 格式
+        const convertedOps: ModifyOperation[] = operations.map((raw: Record<string, unknown>) => {
+          const op = raw.op as string;
+          switch (op) {
+            case "set_param":
+              return {
+                op: "set_param",
+                param_name: raw.param_name as string,
+                value: raw.value,
+              };
+            case "set_input": {
+              const nodeId = raw.node_id as string;
+              const inputName = raw.input_name as string;
+              const value = raw.value;
+              logger.info("set_input operation", { node_id: nodeId, input_name: inputName, value });
+              return {
+                op: "set_input",
+                node_id: nodeId,
+                input_name: inputName,
+                value,
+              };
+            }
+            case "add_node":
+              return {
+                op: "add_node",
+                class_type: raw.class_type as string,
+                inputs: raw.inputs as Record<string, unknown> | undefined,
+                id: raw.id as string | undefined,
+                insert_between: raw.insert_between as { source_id: string; output_index: number; target_id: string; input_name: string } | undefined,
+              };
+            case "remove_node":
+              return {
+                op: "remove_node",
+                node_id: raw.node_id as string,
+              };
+            case "connect":
+              return {
+                op: "connect",
+                source_id: raw.source_id as string,
+                output_index: raw.output_index as number,
+                target_id: raw.target_id as string,
+                input_name: raw.input_name as string,
+              };
+            case "disconnect":
+              return {
+                op: "disconnect",
+                target_id: raw.disconnect_target_id as string,
+                input_name: raw.disconnect_input_name as string,
+              };
+            default:
+              throw new ValidationError(`Unknown operation: ${op}`);
+          }
+        });
+
         // 应用修改
-        const result = await modifyWorkflow(workflow as WorkflowJSON, operations as ModifyOperation[]);
+        const result = await modifyWorkflow(workflow as WorkflowJSON, convertedOps);
 
         // 构建操作描述
-        const opDescs = (operations as ModifyOperation[]).map((op) => {
+        const opDescs = convertedOps.map((op) => {
           const base = `${op.op}`;
-          const detail = "node_id" in op ? op.node_id : ("class_type" in op ? op.class_type : "");
+          const detail = "node_id" in op ? op.node_id : ("class_type" in op ? op.class_type : ("param_name" in op ? op.param_name : ""));
           return `${base} ${detail}`;
         }).join("; ");
 
@@ -162,8 +210,29 @@ export function registerWorkflowComposeTools(server: McpServer): void {
         // 构建返回文本
         const lines = [
           `Session **${session_id}** modified.`,
-          `New nodes added: ${result.added_ids.length > 0 ? result.added_ids.join(", ") : "none"}`,
         ];
+
+        // Operations summary
+        const opSummary = convertedOps.map((op) => {
+          switch (op.op) {
+            case "set_input":
+              return `set_input: Node \`${op.node_id}\`.\`${op.input_name}\` = ${typeof op.value === "string" ? `"${op.value}"` : JSON.stringify(op.value)}`;
+            case "set_param":
+              return `set_param: \`${op.param_name}\` = ${typeof op.value === "string" ? `"${op.value}"` : JSON.stringify(op.value)}`;
+            case "add_node":
+              return `add_node: \`${op.class_type}\` (ID: ${result.added_ids.join(", ")})`;
+            case "remove_node":
+              return `remove_node: \`${op.node_id}\``;
+            case "connect":
+              return `connect: \`${op.source_id}\` → \`${op.target_id}\`.\`${op.input_name}\``;
+            default:
+              return `${op.op}`;
+          }
+        });
+        lines.push("", "**Operations:**");
+        for (const s of opSummary) {
+          lines.push(`- ${s}`);
+        }
 
         if (result.connection_info && result.connection_info.length > 0) {
           lines.push("", "**Auto-connections:**");

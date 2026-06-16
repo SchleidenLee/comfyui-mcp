@@ -644,8 +644,39 @@ export async function saveSession(
       : getWorkflowsDir();
   }
 
+  // 构建文件路径
   const filePath = path.join(basePath, `${slug}.json`);
-  await saveJsonFile(filePath, session.workflow);
+
+  // 生成文件内容
+  if (options.save_as === "template") {
+    // 生成完整模板结构（含 id, name, parameters, workflow）
+    const template: Template = {
+      id: slug,
+      name,
+      category: "custom",
+      description: `Saved from session ${sessionId}`,
+      parameters: {},
+      workflow: session.workflow,
+      source: "custom",
+      file_path: filePath,
+      modified_at: new Date().toISOString(),
+    };
+    await saveJsonFile(filePath, template);
+  } else {
+    // workflow 模式：只存 workflow JSON
+    await saveJsonFile(filePath, session.workflow);
+  }
+
+  // 如果保存为模板，重新加载到缓存
+  if (options.save_as === "template") {
+    try {
+      const loaded = await loadTemplate(filePath, "custom");
+      templateCache.set(loaded.id, loaded);
+      logger.info(`Reloaded template ${loaded.id} into cache`);
+    } catch (err) {
+      logger.warn(`Failed to reload template ${filePath}: ${err}`);
+    }
+  }
 
   logger.info(`Saved session ${sessionId} as ${options.save_as}: ${filePath}`);
 
@@ -731,7 +762,35 @@ export async function importFromJson(
     : (options.sub_path ? path.join(getWorkflowsDir(), options.sub_path) : getWorkflowsDir());
 
   const filePath = path.join(basePath, `${slug}.json`);
-  await saveJsonFile(filePath, workflow);
+
+  if (options.save_as === "template") {
+    const template: Template = {
+      id: slug,
+      name,
+      category: "custom",
+      description: `Imported from JSON`,
+      parameters: {},
+      workflow,
+      source: "custom",
+      file_path: filePath,
+      modified_at: new Date().toISOString(),
+    };
+    await saveJsonFile(filePath, template);
+  } else {
+    await saveJsonFile(filePath, workflow);
+  }
+
+  // 如果保存为模板，重新加载到缓存
+  if (options.save_as === "template") {
+    try {
+      const loaded = await loadTemplate(filePath, "custom");
+      templateCache.set(loaded.id, loaded);
+      logger.info(`Reloaded template ${loaded.id} into cache`);
+    } catch (err) {
+      logger.warn(`Failed to reload template ${filePath}: ${err}`);
+    }
+  }
+
   logger.info(`Imported JSON as ${options.save_as}: ${filePath}`);
 
   return { name: slug, file_path: filePath };

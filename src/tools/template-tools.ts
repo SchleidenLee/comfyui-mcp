@@ -375,54 +375,6 @@ export function registerTemplateTools(server: McpServer): void {
   );
 
   // ==========================================================================
-  // save_session_as_template - 兼容旧版（已弃用，指向 save_session）
-  // ==========================================================================
-  server.tool(
-    "save_session_as_template",
-    "DEPRECATED: Use save_session instead. Save a session as a reusable custom template.",
-    {
-      session_id: z.string().describe("Session ID to save"),
-      name: z.string().describe("Template name"),
-    },
-    async ({ session_id, name }) => {
-      const session = getSession(session_id);
-      if (!session) {
-        return { content: [{ type: "text", text: `Session not found: ${session_id}` }] };
-      }
-      try {
-        const result = await saveAsTemplate(session_id, name);
-        return { content: [{ type: "text", text: `Saved as template: **${result.id}**\nFile: ${result.file_path}` }] };
-      } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
-      }
-    },
-  );
-
-  // ==========================================================================
-  // save_session_as_workflow - 兼容旧版（已弃用，指向 save_session）
-  // ==========================================================================
-  server.tool(
-    "save_session_as_workflow",
-    "DEPRECATED: Use save_session instead. Save a session as a workflow file.",
-    {
-      session_id: z.string().describe("Session ID to save"),
-      name: z.string().describe("Workflow name"),
-    },
-    async ({ session_id, name }) => {
-      const session = getSession(session_id);
-      if (!session) {
-        return { content: [{ type: "text", text: `Session not found: ${session_id}` }] };
-      }
-      try {
-        const result = await saveAsWorkflow(session_id, name);
-        return { content: [{ type: "text", text: `Saved as workflow: **${name}**\nFile: ${result.file_path}` }] };
-      } catch (err) {
-        return { content: [{ type: "text", text: `Error: ${err instanceof Error ? err.message : String(err)}` }] };
-      }
-    },
-  );
-
-  // ==========================================================================
   // refresh_templates - 刷新模板缓存
   // ==========================================================================
   server.tool(
