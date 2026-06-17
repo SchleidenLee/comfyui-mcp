@@ -217,11 +217,16 @@ export function registerTemplateTools(server: McpServer): void {
   // ==========================================================================
   server.tool(
     "get_session",
-    "Get the current state of a session, including node count and modification info.",
+    "Get the current state of a session. By default returns metadata plus the full workflow JSON (including node IDs, class types, and inputs) so agents can inspect the structure before calling modify_workflow. Use compact=true for just metadata.",
     {
       session_id: z.string().describe("Session ID (returned by select_template or load_workflow)"),
+      compact: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("If true, return only metadata (session_id, node_count, etc.) without the full workflow JSON"),
     },
-    async ({ session_id }) => {
+    async ({ session_id, compact }) => {
       const session = getSession(session_id);
       if (!session) {
         return {
@@ -237,22 +242,24 @@ export function registerTemplateTools(server: McpServer): void {
       const nodeCount = Object.keys(session.workflow).length;
       const age = Math.round((Date.now() - session.created_at) / 1000);
 
+      const result: Record<string, unknown> = {
+        session_id: session.id,
+        source_type: session.source_type,
+        source_id: session.source_id,
+        node_count: nodeCount,
+        created_seconds_ago: age,
+        last_modified: new Date(session.last_modified).toISOString(),
+      };
+
+      if (!compact) {
+        result.workflow = session.workflow;
+      }
+
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(
-              {
-                session_id: session.id,
-                source_type: session.source_type,
-                source_id: session.source_id,
-                node_count: nodeCount,
-                created_seconds_ago: age,
-                last_modified: new Date(session.last_modified).toISOString(),
-              },
-              null,
-              2,
-            ),
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };
